@@ -1,1 +1,2 @@
 from .usuario import UsuarioViewSet
+from .customTokenObtainPairView import CustomTokenObtainPairView

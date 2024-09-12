@@ -1,3 +1,4 @@
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError
 from django.contrib.auth.models import User
 
@@ -36,3 +37,19 @@ class UsuarioSerializer(ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token['user_id'] = user.id
+
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        data['user_id'] = self.user.id
+
+        return data
