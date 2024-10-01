@@ -9,6 +9,7 @@ router = routers.DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet)
 router.register(r'funcoes', FuncaoViewSet)
 router.register(r'equipes', EquipeViewSet)
+router.register(r'escalas', EscalaViewSet)
 router.register(r'indisponibilidades', IndisponibilidadeViewSet)
 
 urlpatterns = [

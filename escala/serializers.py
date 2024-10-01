@@ -127,3 +127,55 @@ class EquipeSerializer(ModelSerializer):
         return instance
 
 
+class CreateEscalaSerializer(ModelSerializer):
+    participacoes = ParticipacaoEscalaSerializer(many=True)
+    class Meta:
+        model = Escala
+        fields = '__all__'
+    def validate(self, data):
+        participacoes = data['participacoes']
+        for participacao in participacoes:
+            usuario = participacao['usuario']
+            indisponibilidades = usuario.indisponibilidades.filter(data_inicio__lte=data['data'])
+            if indisponibilidades.exists():
+                raise ValidationError(f'O usuário {usuario} está indisponível nesta data.')
+            # if ParticipacaoEscala.objects.filter(escala=data['escala'], usuario=data['usuario']).exists():
+                # raise ValidationError('Este usuário já está participando desta escala.')
+        return data
+    def add_participacoes(self, escala, participacoes):
+        for participacao in participacoes:
+            funcoes_data = participacao.pop('funcoes')
+            usuario_data = participacao.pop('usuario').id
+
+            try:
+                usuario = Usuario.objects.get(id=usuario_data)
+            except Usuario.DoesNotExist:
+                raise ValidationError(f"O usuario {usuario_data} não faz parte da equipe {escala.equipe.nome}.")
+
+            participacao_escala = ParticipacaoEscala.objects.create(escala=escala, usuario=usuario)
+            participacao_escala.funcoes.set(funcoes_data)
+            participacao_escala.save()
+    def create(self, validated_data):
+        participacoes = validated_data.pop('participacoes')
+
+        escala = Escala.objects.create(**validated_data)
+
+        self.add_participacoes(escala, participacoes)
+
+        return escala
+    def update(self, instance, validated_data):
+        participacoes_data = validated_data.pop('participacoes')
+        instance = super().update(instance, validated_data)
+        instance.participacoes.all().delete()
+        self.add_participacoes(instance, participacoes_data)
+        return instance
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
+    #     data['participacoes'] = ParticipacaoEscalaRetrieveSerializer(instance.participacoes.all(), many=True).data
+    #     return data
+
+class RetrieveEscalaSerializer(ModelSerializer):
+    participacoes = ParticipacaoEscalaRetrieveSerializer(many=True)
+    class Meta:
+        model = Escala
+        fields = '__all__'

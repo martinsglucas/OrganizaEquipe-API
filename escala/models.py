@@ -74,3 +74,12 @@ class Indisponibilidade(models.Model):
         return f'{self.descricao} ({self.usuario.first_name})'
 
 
+class Escala(models.Model):
+    nome = models.CharField(max_length=100)
+    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='escalas')
+    data = models.DateField()
+    hora = models.TimeField()
+
+    def __str__(self):
+        return f'{self.nome} - {self.equipe.nome} ({self.data})'
+
