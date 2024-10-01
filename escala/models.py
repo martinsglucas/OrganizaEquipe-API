@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
@@ -37,6 +38,22 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.first_name
 
+
+def generate_unique_access_code():
+    while True:
+        code = uuid.uuid4().hex[:6].upper()
+        if not Equipe.objects.filter(codigo_de_acesso=code).exists():
+            return code
+
+class Equipe(models.Model):
+    nome = models.CharField(max_length=100)
+    administradores = models.ManyToManyField('Usuario', related_name='equipes_administradas')
+    codigo_de_acesso = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
+    membros = models.ManyToManyField('Usuario', related_name='equipes')
+
+
+    def __str__(self):
+        return self.nome
 
 class Funcao(models.Model):
     nome = models.CharField(max_length=100)

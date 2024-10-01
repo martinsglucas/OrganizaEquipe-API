@@ -3,11 +3,12 @@ from django.urls import path, include
 from rest_framework import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from escala.views import CustomTokenObtainPairView, UsuarioViewSet
+from escala.views import CustomTokenObtainPairView, UsuarioViewSet, FuncaoViewSet, EquipeViewSet, EscalaViewSet, IndisponibilidadeViewSet, ParticipacaoEscalaViewSet
 
 router = routers.DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet)
 router.register(r'funcoes', FuncaoViewSet)
+router.register(r'equipes', EquipeViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
