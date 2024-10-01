@@ -127,6 +127,39 @@ class EquipeSerializer(ModelSerializer):
         return instance
 
 
+class ParticipacaoEscalaSerializer(ModelSerializer):
+    funcoes = PrimaryKeyRelatedField(queryset=Funcao.objects.all(), many=True)
+    usuario = PrimaryKeyRelatedField(queryset=Usuario.objects.all())
+    class Meta:
+        model = ParticipacaoEscala
+        fields = ('funcoes','usuario')
+    def create(self, validated_data):
+        funcoes_data = validated_data.pop('funcoes')
+        membro_data = validated_data.pop('usuario')
+        participacao_escala = ParticipacaoEscala.objects.create(**validated_data)
+        participacao_escala.funcoes.set(funcoes_data)
+        participacao_escala.membro = Usuario.objects.get(usuario=membro_data)
+        participacao_escala.save()
+        return participacao_escala
+
+class ParticipacaoEscalaRetrieveSerializer(ModelSerializer):
+    funcoes = FuncaoSerializer(many=True)
+    usuario = UsuarioMembroSerializer()
+    class Meta:
+        model = ParticipacaoEscala
+        fields = ('funcoes','usuario', 'confirmacao')
+
+class ParticipacaoEscalaUpdateSerializer(ModelSerializer):
+    funcoes = PrimaryKeyRelatedField(queryset=Funcao.objects.all(), many=True)
+    class Meta:
+        model = ParticipacaoEscala
+        fields = ('funcoes','confirmacao')
+    def update(self, instance, validated_data):
+        funcoes_data = validated_data.pop('funcoes')
+        instance = super().update(instance, validated_data)
+        instance.funcoes.set(funcoes_data)
+        return instance
+
 class CreateEscalaSerializer(ModelSerializer):
     participacoes = ParticipacaoEscalaSerializer(many=True)
     class Meta:

@@ -83,3 +83,15 @@ class Escala(models.Model):
     def __str__(self):
         return f'{self.nome} - {self.equipe.nome} ({self.data})'
 
+class ParticipacaoEscala(models.Model):
+    escala = models.ForeignKey('Escala', on_delete=models.CASCADE, related_name='participacoes')
+    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='escalas')
+    confirmacao = models.BooleanField(default=False, null=True)
+    funcoes = models.ManyToManyField('Funcao', related_name='participacoes_funcoes')
+    
+    class Meta:
+        unique_together = ('escala', 'usuario')
+        verbose_name_plural = 'Participacoes'
+
+    def __str__(self):
+        return f'{self.escala.nome} - {self.usuario.first_name}'

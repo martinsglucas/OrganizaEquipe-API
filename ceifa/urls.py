@@ -11,6 +11,7 @@ router.register(r'funcoes', FuncaoViewSet)
 router.register(r'equipes', EquipeViewSet)
 router.register(r'escalas', EscalaViewSet)
 router.register(r'indisponibilidades', IndisponibilidadeViewSet)
+router.register(r'participacoes', ParticipacaoEscalaViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
