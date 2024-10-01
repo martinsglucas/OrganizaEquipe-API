@@ -37,3 +37,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.first_name
 
+
+class Funcao(models.Model):
+    nome = models.CharField(max_length=100)
+    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='funcoes')
+    class Meta:
+        verbose_name_plural = 'Funcoes'
+
+    def __str__(self):
+        return f"{self.nome} ({self.equipe.nome})"

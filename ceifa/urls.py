@@ -7,6 +7,7 @@ from escala.views import CustomTokenObtainPairView, UsuarioViewSet
 
 router = routers.DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet)
+router.register(r'funcoes', FuncaoViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -66,3 +66,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user_id'] = self.user.id
 
         return data
+
+class FuncaoSerializer(ModelSerializer):
+    class Meta:
+        model = Funcao
+        fields = '__all__'
