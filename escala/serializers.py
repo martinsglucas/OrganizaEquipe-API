@@ -1,30 +1,30 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework.serializers import ModelSerializer, CharField, ValidationError
+from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
 from django.contrib.auth.models import User
+from escala.models import Usuario, Funcao, Equipe, Escala, ParticipacaoEscala, Indisponibilidade
+from django.contrib.auth import authenticate
+
 
 class UsuarioSerializer(ModelSerializer):
     password = CharField(write_only=True, required=True)
 
     class Meta:
-        model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'password']
+        model = Usuario
+        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'password']
         read_only_fields = ['is_active', 'is_staff', 'is_superuser']
         extra_kwargs = {
-            'username': {'required': True},
             'email': {'required': True},
         }
     
     def validate(self, data):
         if self.instance is None:
-            if User.objects.filter(username=data['username']).exists():
-                raise ValidationError({'username': 'Já existe um usuário com este username.'})
-            if User.objects.filter(email=data['email']).exists():
+            if Usuario.objects.filter(email=data['email']).exists():
                 raise ValidationError({'email': 'Já existe um usuário com este email.'})
         return data
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = User(**validated_data)
+        user = Usuario(**validated_data)
         user.set_password(password)
         user.save()
         return user
@@ -38,6 +38,12 @@ class UsuarioSerializer(ModelSerializer):
         instance.save()
         return instance
 
+
+class UsuarioMembroSerializer(ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['id', 'first_name', 'last_name', 'email']
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -48,6 +54,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        email = attrs.get('email')
+        password = attrs.get('password')
+        user = authenticate(username=email, password=password)
+        
+        if not user:
+            raise ValidationError('Invalid email or password')
+        
         data = super().validate(attrs)
 
         data['user_id'] = self.user.id
