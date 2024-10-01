@@ -63,3 +63,14 @@ class Funcao(models.Model):
 
     def __str__(self):
         return f"{self.nome} ({self.equipe.nome})"
+
+class Indisponibilidade(models.Model):
+    descricao = models.CharField(max_length=100)
+    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='indisponibilidades')
+    data_inicio = models.DateField()
+    data_fim = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.descricao} ({self.usuario.first_name})'
+
+
