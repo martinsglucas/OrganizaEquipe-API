@@ -2,6 +2,17 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from .models import Usuario, Funcao, Equipe, Indisponibilidade, Escala, ParticipacaoEscala
+from django.contrib.auth.models import Group, Permission
+
+group, created = Group.objects.get_or_create(name='Usuarios')
+permissions = Permission.objects.filter(codename__in=[
+    'add_equipe', 'change_equipe', 'delete_equipe', 'view_equipe', 
+    'add_funcao', 'change_funcao', 'delete_funcao', 'view_funcao', 
+    'add_indisponibilidade', 'change_indisponibilidade', 'delete_indisponibilidade', 'view_indisponibilidade', 
+    'add_escala', 'change_escala', 'delete_escala', 'view_escala', 
+    'add_participacaoescala', 'change_participacaoescala', 'delete_participacaoescala', 'view_participacaoescala'
+    'add_usuario', 'change_usuario', 'delete_usuario', 'view_usuario'])
+group.permissions.set(permissions)
 
 class UsuarioCreationForm(UserCreationForm):
     class Meta:
