@@ -41,7 +41,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'ceifa.urls'
+ROOT_URLCONF = 'OrganizaEquipe.urls'
 
 TEMPLATES = [
     {
@@ -59,7 +59,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'ceifa.wsgi.application'
+WSGI_APPLICATION = 'OrganizaEquipe.wsgi.application'
 
 
 # Database
@@ -128,7 +128,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Ceifa API',
+    'TITLE': 'OrganizaEquipe API',
     'DESCRIPTION': 'Your project description',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
