@@ -106,6 +106,20 @@ class ConviteSerializer(ModelSerializer):
             raise ValidationError({"email_destinatario": f"{usuario.first_name} já faz parte dessa equipe."})
         
         return data
+
+class CreateSolicitacaoSerializer(ModelSerializer):
+
+    class Meta:
+        model = Solicitacao
+        fields = '__all__'
+
+class SolicitacaoSerializer(ModelSerializer):
+
+    usuario = UsuarioSerializer()
+
+    class Meta:
+        model = Solicitacao
+        fields = '__all__'
 class CreateEquipeSerializer(ModelSerializer):
     codigo_de_acesso = CharField(read_only=True)
     class Meta:
