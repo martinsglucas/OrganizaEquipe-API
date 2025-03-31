@@ -89,6 +89,23 @@ class IndisponibilidadeSerializer(ModelSerializer):
         model = Indisponibilidade
         fields = ('id', 'usuario','descricao', 'data_inicio', 'data_fim')
 
+class ConviteSerializer(ModelSerializer):
+
+    class Meta:
+        model = Convite
+        fields = '__all__'
+    def validate(self, data):
+        equipe = Equipe.objects.filter(id=data["equipe"].id).first()
+        usuario = Usuario.objects.filter(email=data["email_destinatario"]).first()
+
+        if not equipe:
+            raise ValidationError({"equipe": "Equipe não encontrada."})
+        if not usuario:
+            raise ValidationError({"usuario": "Usuário não encontrado."})
+        if usuario and equipe.membros.filter(id=usuario.id).exists():
+            raise ValidationError({"email_destinatario": f"{usuario.first_name} já faz parte dessa equipe."})
+        
+        return data
 class CreateEquipeSerializer(ModelSerializer):
     codigo_de_acesso = CharField(read_only=True)
     class Meta:
