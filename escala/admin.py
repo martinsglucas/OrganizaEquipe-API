@@ -1,16 +1,19 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from .models import Usuario, Funcao, Equipe, Indisponibilidade, Escala, ParticipacaoEscala
+from .models import Usuario, Funcao, Equipe, Indisponibilidade, Escala, ParticipacaoEscala, Organizacao, Convite, Solicitacao
 from django.contrib.auth.models import Group, Permission
 
 group, created = Group.objects.get_or_create(name='Usuarios')
 permissions = Permission.objects.filter(codename__in=[
+    'add_organizacao', 'change_organizacao', 'delete_organizacao', 'view_organizacao', 
     'add_equipe', 'change_equipe', 'delete_equipe', 'view_equipe', 
     'add_funcao', 'change_funcao', 'delete_funcao', 'view_funcao', 
     'add_indisponibilidade', 'change_indisponibilidade', 'delete_indisponibilidade', 'view_indisponibilidade', 
     'add_escala', 'change_escala', 'delete_escala', 'view_escala', 
-    'add_participacaoescala', 'change_participacaoescala', 'delete_participacaoescala', 'view_participacaoescala'
+    'add_participacaoescala', 'change_participacaoescala', 'delete_participacaoescala', 'view_participacaoescala',
+    'add_convite', 'change_convite', 'delete_convite', 'view_convite'
+    'add_solicitacao', 'change_solicitacao', 'delete_solicitacao', 'view_solicitacao'
     'add_usuario', 'change_usuario', 'delete_usuario', 'view_usuario'])
 group.permissions.set(permissions)
 
@@ -50,6 +53,9 @@ admin.site.register(Usuario, UsuarioAdmin)
 admin.site.register(Funcao)
 admin.site.register(Indisponibilidade)
 admin.site.register(ParticipacaoEscala)
+admin.site.register(Organizacao)
+admin.site.register(Convite)
+admin.site.register(Solicitacao)
 
 class FuncaoInline(admin.TabularInline):
     model = Funcao
