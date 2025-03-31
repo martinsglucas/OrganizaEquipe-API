@@ -104,3 +104,11 @@ class ParticipacaoEscala(models.Model):
 
     def __str__(self):
         return f'{self.escala.nome} - {self.usuario.first_name}'
+
+class Convite(models.Model):
+    email_destinatario = models.EmailField(max_length=100)
+    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='convites')
+    nome_remetente = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f'{self.nome_remetente} convida {self.email_destinatario} para equipe {self.equipe}'
