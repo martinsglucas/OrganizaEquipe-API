@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
 from django.contrib.auth.models import User
-from escala.models import Usuario, Funcao, Equipe, Escala, ParticipacaoEscala, Indisponibilidade
+from escala.models import Usuario, Funcao, Equipe, Escala, ParticipacaoEscala, Indisponibilidade, Organizacao, Convite, Solicitacao
 from django.contrib.auth import authenticate
 
 class UsuarioSerializer(ModelSerializer):
@@ -120,11 +120,28 @@ class SolicitacaoSerializer(ModelSerializer):
     class Meta:
         model = Solicitacao
         fields = '__all__'
+
+class OrganizacaoSerializer(ModelSerializer):
+    administradores = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
+    membros = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
+    class Meta:
+        model = Organizacao
+        fields = ['id', 'nome', 'administradores', 'membros']
+    def update(self, instance, validated_data):
+        administradores_data = validated_data.pop('administradores', None)
+        membros_data = validated_data.pop('membros', None)
+        instance = super().update(instance, validated_data)
+        if administradores_data is not None:
+            instance.administradores.set(administradores_data)
+        if membros_data is not None:
+            instance.membros.set(membros_data)
+        return instance
+
 class CreateEquipeSerializer(ModelSerializer):
     codigo_de_acesso = CharField(read_only=True)
     class Meta:
         model = Equipe
-        fields = ['id', 'nome', 'codigo_de_acesso']
+        fields = ['id', 'nome', 'codigo_de_acesso', 'organizacao']
     def create(self, validated_data):
         user = self.context['request'].user
         equipe = Equipe.objects.create(**validated_data)
@@ -136,9 +153,10 @@ class RetrieveEquipeSerializer(ModelSerializer):
     administradores = UsuarioMembroSerializer(many=True)
     funcoes = FuncaoSerializer(many=True)
     membros = UsuarioMembroSerializer(many=True)
+    convites = ConviteSerializer(many=True)
     class Meta:
         model = Equipe
-        fields = ['id', 'nome', 'codigo_de_acesso', 'administradores', 'funcoes', 'membros']
+        fields = ['id', 'nome', 'codigo_de_acesso', 'administradores', 'funcoes', 'membros', 'organizacao', 'convites']
 
 class EquipeSerializer(ModelSerializer):
     administradores = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
