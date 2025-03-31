@@ -112,3 +112,12 @@ class Convite(models.Model):
 
     def __str__(self):
         return f'{self.nome_remetente} convida {self.email_destinatario} para equipe {self.equipe}'
+
+class Solicitacao(models.Model):
+    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='solicitacoes')
+    codigo_equipe = models.CharField(max_length=6)
+
+    class Meta:
+        verbose_name_plural = 'Solicitacoes'
+    def __str__(self):
+        return f'{self.usuario} solicita ingressar via codigo {self.codigo_equipe}'
