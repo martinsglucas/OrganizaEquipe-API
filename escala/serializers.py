@@ -79,7 +79,7 @@ class CreateIndisponibilidadeSerializer(ModelSerializer):
     usuario = HiddenField(default=CurrentUserDefault())
     class Meta:
         model = Indisponibilidade
-        fields = ('usuario','descricao', 'data_inicio', 'data_fim')
+        fields = ('id','usuario','descricao', 'data_inicio', 'data_fim')
     def create(self, validated_data):
         indisponibilidade = Indisponibilidade.objects.create(**validated_data)
         return indisponibilidade
@@ -87,7 +87,7 @@ class CreateIndisponibilidadeSerializer(ModelSerializer):
 class IndisponibilidadeSerializer(ModelSerializer):
     class Meta:
         model = Indisponibilidade
-        fields = ('usuario','descricao', 'data_inicio', 'data_fim')
+        fields = ('id', 'usuario','descricao', 'data_inicio', 'data_fim')
 
 class CreateEquipeSerializer(ModelSerializer):
     codigo_de_acesso = CharField(read_only=True)
