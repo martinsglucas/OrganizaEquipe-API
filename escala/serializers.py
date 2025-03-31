@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 from escala.models import Usuario, Funcao, Equipe, Escala, ParticipacaoEscala, Indisponibilidade
 from django.contrib.auth import authenticate
 
-
 class UsuarioSerializer(ModelSerializer):
     password = CharField(write_only=True, required=True)
 
@@ -38,7 +37,6 @@ class UsuarioSerializer(ModelSerializer):
         instance.save()
         return instance
 
-
 class UsuarioMembroSerializer(ModelSerializer):
     class Meta:
         model = Usuario
@@ -48,8 +46,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-
-        token['user_id'] = user.id
 
         return token
 
@@ -62,7 +58,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise ValidationError('Invalid email or password')
         
         data = super().validate(attrs)
-        data['user_id'] = self.user.id
+        data['user'] = {
+            'id': user.id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'is_active': user.is_active,
+            'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser
+        }
 
         return data
 
