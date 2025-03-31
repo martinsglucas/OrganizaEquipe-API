@@ -3,10 +3,12 @@ from django.urls import path, include
 from rest_framework import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from escala.views import CustomTokenObtainPairView, UsuarioViewSet, FuncaoViewSet, OrganizacaoViewSet, EquipeViewSet, EscalaViewSet, IndisponibilidadeViewSet, ParticipacaoEscalaViewSet, ConviteViewSet, SolicitacaoViewSet
 from escala.views import CustomTokenObtainPairView, UsuarioViewSet, FuncaoViewSet, EquipeViewSet, EscalaViewSet, IndisponibilidadeViewSet, ParticipacaoEscalaViewSet
 
 router = routers.DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet)
+router.register(r'organizacoes', OrganizacaoViewSet)
 router.register(r'funcoes', FuncaoViewSet)
 router.register(r'equipes', EquipeViewSet)
 router.register(r'escalas', EscalaViewSet)
