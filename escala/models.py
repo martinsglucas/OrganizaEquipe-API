@@ -38,6 +38,15 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.first_name
 
+class Organizacao(models.Model):
+    nome = models.CharField(max_length=100)
+    administradores = models.ManyToManyField('Usuario', related_name='organizacoes_administradas')
+    membros = models.ManyToManyField('Usuario', related_name='organizacoes')
+    class Meta:
+        verbose_name_plural = 'Organizacoes'
+
+    def __str__(self):
+        return self.nome
 
 def generate_unique_access_code():
     while True:
@@ -49,8 +58,8 @@ class Equipe(models.Model):
     nome = models.CharField(max_length=100)
     administradores = models.ManyToManyField('Usuario', related_name='equipes_administradas')
     codigo_de_acesso = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
+    organizacao = models.ForeignKey('Organizacao', on_delete=models.CASCADE, related_name='equipes')
     membros = models.ManyToManyField('Usuario', related_name='equipes')
-
 
     def __str__(self):
         return self.nome
