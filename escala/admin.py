@@ -1,35 +1,36 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from .models import Usuario, Funcao, Equipe, Indisponibilidade, Escala, ParticipacaoEscala, Organizacao, Convite, Solicitacao
+from .models import User, Role, Team, Unavailability, Schedule, ScheduleParticipation, Organization, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth.models import Group, Permission
 
-group, created = Group.objects.get_or_create(name='Usuarios')
+group, created = Group.objects.get_or_create(name='Users')
 permissions = Permission.objects.filter(codename__in=[
-    'add_organizacao', 'change_organizacao', 'delete_organizacao', 'view_organizacao', 
-    'add_equipe', 'change_equipe', 'delete_equipe', 'view_equipe', 
-    'add_funcao', 'change_funcao', 'delete_funcao', 'view_funcao', 
-    'add_indisponibilidade', 'change_indisponibilidade', 'delete_indisponibilidade', 'view_indisponibilidade', 
-    'add_escala', 'change_escala', 'delete_escala', 'view_escala', 
-    'add_participacaoescala', 'change_participacaoescala', 'delete_participacaoescala', 'view_participacaoescala',
-    'add_convite', 'change_convite', 'delete_convite', 'view_convite'
-    'add_solicitacao', 'change_solicitacao', 'delete_solicitacao', 'view_solicitacao'
-    'add_usuario', 'change_usuario', 'delete_usuario', 'view_usuario'])
+    'add_organization', 'change_organization', 'delete_organization', 'view_organization', 
+    'add_team', 'change_team', 'delete_team', 'view_team', 
+    'add_role', 'change_role', 'delete_role', 'view_role', 
+    'add_unavailability', 'change_unavailability', 'delete_unavailability', 'view_unavailability', 
+    'add_schedule', 'change_schedule', 'delete_schedule', 'view_schedule', 
+    'add_scheduleparticipation', 'change_scheduleparticipation', 'delete_scheduleparticipation', 'view_scheduleparticipation',
+    'add_teaminvitation', 'change_teaminvitation', 'delete_teaminvitation', 'view_teaminvitation',
+    'add_organizationinvitation', 'change_organizationinvitation', 'delete_organizationinvitation', 'view_organizationinvitation',
+    'add_request', 'change_request', 'delete_request', 'view_request',
+    'add_user', 'change_user', 'delete_user', 'view_user'])
 group.permissions.set(permissions)
 
-class UsuarioCreationForm(UserCreationForm):
+class UserCreationForm(UserCreationForm):
     class Meta:
-        model = Usuario
+        model = User
         fields = ('email', 'username', 'first_name', 'last_name', 'is_staff', 'is_active', 'is_superuser')
 
-class UsuarioChangeForm(UserChangeForm):
+class UserChangeForm(UserChangeForm):
     class Meta:
-        model = Usuario
+        model = User
         fields = ('email', 'username', 'first_name', 'last_name', 'is_staff', 'is_active', 'is_superuser')
 
-class UsuarioAdmin(BaseUserAdmin):
-    form = UsuarioChangeForm
-    add_form = UsuarioCreationForm
+class UserAdmin(BaseUserAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
 
     list_display = ('email', 'username', 'first_name', 'last_name', 'is_staff', 'is_active', 'is_superuser')
     list_filter = ('is_staff', 'is_active', 'is_superuser')
@@ -49,28 +50,29 @@ class UsuarioAdmin(BaseUserAdmin):
     ordering = ('email',)
     filter_horizontal = ('groups', 'user_permissions')
 
-admin.site.register(Usuario, UsuarioAdmin)
-admin.site.register(Funcao)
-admin.site.register(Indisponibilidade)
-admin.site.register(ParticipacaoEscala)
-admin.site.register(Organizacao)
-admin.site.register(Convite)
-admin.site.register(Solicitacao)
+admin.site.register(User, UserAdmin)
+admin.site.register(Role)
+admin.site.register(Unavailability)
+admin.site.register(ScheduleParticipation)
+admin.site.register(Organization)
+admin.site.register(TeamInvitation)
+admin.site.register(OrganizationInvitation)
+admin.site.register(Request)
 
-class FuncaoInline(admin.TabularInline):
-    model = Funcao
+class RoleInline(admin.TabularInline):
+    model = Role
     extra = 1
 
-class ParticipacaoEscalaInline(admin.TabularInline):
-    model = ParticipacaoEscala
+class ScheduleParticipationInline(admin.TabularInline):
+    model = ScheduleParticipation
     extra = 1
 
-@admin.register(Equipe)
-class EquipeAdmin(admin.ModelAdmin):
-    inlines = (FuncaoInline,)
-    list_display = ('nome', 'codigo_de_acesso')
-    search_fields = ('nome', 'codigo_de_acesso')
+@admin.register(Team)
+class TeamAdmin(admin.ModelAdmin):
+    inlines = (RoleInline,)
+    list_display = ('name', 'code_access')
+    search_fields = ('name', 'code_access')
 
-@admin.register(Escala)
-class EscalaAdmin(admin.ModelAdmin):
-    inlines = (ParticipacaoEscalaInline,)
+@admin.register(Schedule)
+class ScheduleAdmin(admin.ModelAdmin):
+    inlines = (ScheduleParticipationInline,)
