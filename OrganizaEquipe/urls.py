@@ -3,19 +3,20 @@ from django.urls import path, include
 from rest_framework import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from escala.views import CustomTokenObtainPairView, UsuarioViewSet, FuncaoViewSet, OrganizacaoViewSet, EquipeViewSet, EscalaViewSet, IndisponibilidadeViewSet, ParticipacaoEscalaViewSet, ConviteViewSet, SolicitacaoViewSet
+from escala.views import CustomTokenObtainPairView, UserViewSet, RoleViewSet, OrganizationViewSet, TeamViewSet, ScheduleViewSet, UnavailabilityViewSet, ScheduleParticipationViewSet, TeamInvitationViewSet, OrganizationInvitationViewSet, RequestViewSet
 from rest_framework_simplejwt.views import TokenVerifyView
 
 router = routers.DefaultRouter()
-router.register(r'usuarios', UsuarioViewSet)
-router.register(r'organizacoes', OrganizacaoViewSet)
-router.register(r'funcoes', FuncaoViewSet)
-router.register(r'equipes', EquipeViewSet)
-router.register(r'escalas', EscalaViewSet)
-router.register(r'indisponibilidades', IndisponibilidadeViewSet)
-router.register(r'participacoes', ParticipacaoEscalaViewSet)
-router.register(r'convites', ConviteViewSet)
-router.register(r'solicitacoes', SolicitacaoViewSet)
+router.register(r'users', UserViewSet)
+router.register(r'organizations', OrganizationViewSet)
+router.register(r'roles', RoleViewSet)
+router.register(r'teams', TeamViewSet)
+router.register(r'schedules', ScheduleViewSet)
+router.register(r'unavailability', UnavailabilityViewSet)
+router.register(r'participations', ScheduleParticipationViewSet)
+router.register(r'team_invitations', TeamInvitationViewSet)
+router.register(r'organization_invitations', OrganizationInvitationViewSet)
+router.register(r'requests', RequestViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
