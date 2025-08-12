@@ -16,7 +16,7 @@ class TeamViewSet(ModelViewSet):
         code_access = self.request.query_params.get('codeAccess', None)
         
         if user_only:
-            queryset = queryset.filter(membros=self.request.user)
+            queryset = queryset.filter(members=self.request.user)
         if code_access:
             queryset = queryset.filter(code_access=code_access)
         
