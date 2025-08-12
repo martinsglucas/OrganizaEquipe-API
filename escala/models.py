@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
-class UsuarioManager(BaseUserManager):
+class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if email is None:
             raise TypeError('Usuários devem ter um email.')
@@ -19,7 +19,7 @@ class UsuarioManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         return self.create_user(email, password, **extra_fields)
 
-class Usuario(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin):
     id = models.AutoField(primary_key=True) 
     email = models.EmailField(max_length=100, unique=True) 
     username = models.CharField(max_length=100, unique=True, blank=True, null=True)
@@ -33,91 +33,99 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
-    objects = UsuarioManager()
+    objects = UserManager()
 
     def __str__(self):
         return self.first_name
 
-class Organizacao(models.Model):
-    nome = models.CharField(max_length=100)
-    administradores = models.ManyToManyField('Usuario', related_name='organizacoes_administradas')
-    membros = models.ManyToManyField('Usuario', related_name='organizacoes')
-    class Meta:
-        verbose_name_plural = 'Organizacoes'
-
-    def __str__(self):
-        return self.nome
-
 def generate_unique_access_code():
     while True:
         code = uuid.uuid4().hex[:6].upper()
-        if not Equipe.objects.filter(codigo_de_acesso=code).exists():
+        if not (Team.objects.filter(code_access=code).exists() or Organization.objects.filter(code_access=code).exists()):
             return code
 
-class Equipe(models.Model):
-    nome = models.CharField(max_length=100)
-    administradores = models.ManyToManyField('Usuario', related_name='equipes_administradas')
-    codigo_de_acesso = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
-    organizacao = models.ForeignKey('Organizacao', on_delete=models.CASCADE, related_name='equipes')
-    membros = models.ManyToManyField('Usuario', related_name='equipes')
+class Organization(models.Model):
+    name = models.CharField(max_length=100)
+    admins = models.ManyToManyField('User', related_name='administered_organizations')
+    members = models.ManyToManyField('User', related_name='organizations')
+    code_access = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
 
     def __str__(self):
-        return self.nome
+        return self.name
 
-class Funcao(models.Model):
-    nome = models.CharField(max_length=100)
-    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='funcoes')
+class Team(models.Model):
+    name = models.CharField(max_length=100)
+    admins = models.ManyToManyField('User', related_name='administered_teams')
+    code_access = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
+    organization = models.ForeignKey('Organization', on_delete=models.CASCADE, related_name='teams')
+    members = models.ManyToManyField('User', related_name='teams')
+
+    def __str__(self):
+        return self.name
+
+class Role(models.Model):
+    name = models.CharField(max_length=100)
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='roles')
+
+    def __str__(self):
+        return f"{self.name} ({self.team.name})"
+
+class Unavailability(models.Model):
+    description = models.CharField(max_length=100)
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='unavailability')
+    start_date = models.DateField()
+    end_date = models.DateField(blank=True, null=True)
+
     class Meta:
-        verbose_name_plural = 'Funcoes'
+        verbose_name_plural = 'Unavailabilities'
 
     def __str__(self):
-        return f"{self.nome} ({self.equipe.nome})"
-
-class Indisponibilidade(models.Model):
-    descricao = models.CharField(max_length=100)
-    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='indisponibilidades')
-    data_inicio = models.DateField()
-    data_fim = models.DateField(blank=True, null=True)
-
-    def __str__(self):
-        return f'{self.descricao} ({self.usuario.first_name})'
+        return f'{self.description} ({self.user.first_name})'
 
 
-class Escala(models.Model):
-    nome = models.CharField(max_length=100)
-    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='escalas')
-    data = models.DateField()
-    hora = models.TimeField()
+class Schedule(models.Model):
+    name = models.CharField(max_length=100)
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='schedules')
+    date = models.DateField()
+    hour = models.TimeField()
 
     def __str__(self):
-        return f'{self.nome} - {self.equipe.nome} ({self.data})'
+        return f'{self.name} - {self.team.name} ({self.date})'
 
-class ParticipacaoEscala(models.Model):
-    escala = models.ForeignKey('Escala', on_delete=models.CASCADE, related_name='participacoes')
-    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='escalas')
-    confirmacao = models.BooleanField(default=False, null=True)
-    funcoes = models.ManyToManyField('Funcao', related_name='participacoes_funcoes')
+class ScheduleParticipation(models.Model):
+    schedule = models.ForeignKey('Schedule', on_delete=models.CASCADE, related_name='participations')
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='schedules')
+    confirmation = models.BooleanField(default=False, null=True)
+    roles = models.ManyToManyField('Role', related_name='participations_roles')
     
     class Meta:
-        unique_together = ('escala', 'usuario')
-        verbose_name_plural = 'Participacoes'
+        unique_together = ('schedule', 'user')
+        verbose_name_plural = 'Participations'
 
     def __str__(self):
         return f'{self.escala.nome} - {self.usuario.first_name}'
 
-class Convite(models.Model):
-    email_destinatario = models.EmailField(max_length=100)
-    equipe = models.ForeignKey('Equipe', on_delete=models.CASCADE, related_name='convites')
-    nome_remetente = models.CharField(max_length=100)
+class TeamInvitation(models.Model):
+    recipient_email = models.EmailField(max_length=100)
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='invitations')
+    sender_name = models.CharField(max_length=100)
 
     def __str__(self):
-        return f'{self.nome_remetente} convida {self.email_destinatario} para equipe {self.equipe}'
+        return f'{self.sender_name} convida {self.recipient_email} para equipe {self.team}'
+    
+class OrganizationInvitation(models.Model):
+    recipient_email = models.EmailField(max_length=100)
+    organization = models.ForeignKey('Organization', on_delete=models.CASCADE, related_name='invitations')
+    sender_name = models.CharField(max_length=100)
 
-class Solicitacao(models.Model):
-    usuario = models.ForeignKey('Usuario', on_delete=models.CASCADE, related_name='solicitacoes')
-    codigo_equipe = models.CharField(max_length=6)
+    def __str__(self):
+        return f'{self.sender_name} convida {self.recipient_email} para organização {self.organization}'
+
+class Request(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='requests')
+    code = models.CharField(max_length=6)
 
     class Meta:
-        verbose_name_plural = 'Solicitacoes'
+        verbose_name_plural = 'Requests'
     def __str__(self):
-        return f'{self.usuario} solicita ingressar via codigo {self.codigo_equipe}'
+        return f'{self.user} solicita ingressar via codigo {self.code}'
