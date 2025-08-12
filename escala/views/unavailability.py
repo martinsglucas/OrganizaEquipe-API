@@ -1,11 +1,12 @@
 from rest_framework.viewsets import ModelViewSet
-from escala.models import Indisponibilidade
-from escala.serializers import IndisponibilidadeSerializer, CreateIndisponibilidadeSerializer
+from escala.models import Unavailability
+from escala.serializers import UnavailabilitySerializer, CreateUnavailabilitySerializer
 from datetime import datetime, timedelta
 from django.db.models import Q
 
-class IndisponibilidadeViewSet(ModelViewSet):
-    queryset = Indisponibilidade.objects.all()
+class UnavailabilityViewSet(ModelViewSet):
+    queryset = Unavailability.objects.all()
+    
     def get_queryset(self):
         queryset = super().get_queryset()
         user_only = self.request.query_params.get('userOnly', 'false').lower() == 'true'
@@ -19,13 +20,14 @@ class IndisponibilidadeViewSet(ModelViewSet):
                 first_day = date_obj.replace(day=1)
                 last_day = (date_obj.replace(month=date_obj.month % 12 + 1, day=1) - timedelta(days=1))
                 queryset = queryset.filter(
-                    Q(data_inicio__gte=first_day , data_inicio__lte=last_day)
+                    Q(start_date__gte=first_day , start_date__lte=last_day)
                 )
             except ValueError:
                 pass
         
         return queryset
+    
     def get_serializer_class(self):
         if self.action == 'create':
-            return CreateIndisponibilidadeSerializer
-        return IndisponibilidadeSerializer
+            return CreateUnavailabilitySerializer
+        return UnavailabilitySerializer
