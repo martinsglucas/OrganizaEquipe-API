@@ -1,14 +1,13 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
-from django.contrib.auth.models import User
-from escala.models import Usuario, Funcao, Equipe, Escala, ParticipacaoEscala, Indisponibilidade, Organizacao, Convite, Solicitacao
+from escala.models import User, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth import authenticate
 
-class UsuarioSerializer(ModelSerializer):
+class UserSerializer(ModelSerializer):
     password = CharField(write_only=True, required=True)
 
     class Meta:
-        model = Usuario
+        model = User
         fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'password']
         read_only_fields = ['is_active', 'is_staff', 'is_superuser']
         extra_kwargs = {
@@ -17,13 +16,13 @@ class UsuarioSerializer(ModelSerializer):
     
     def validate(self, data):
         if self.instance is None:
-            if Usuario.objects.filter(email=data['email']).exists():
+            if User.objects.filter(email=data['email']).exists():
                 raise ValidationError({'email': 'Já existe um usuário com este email.'})
         return data
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = Usuario(**validated_data)
+        user = User(**validated_data)
         user.set_password(password)
         user.save()
         return user
@@ -37,9 +36,9 @@ class UsuarioSerializer(ModelSerializer):
         instance.save()
         return instance
 
-class UsuarioMembroSerializer(ModelSerializer):
+class UserMemberSerializer(ModelSerializer):
     class Meta:
-        model = Usuario
+        model = User
         fields = ['id', 'first_name', 'last_name', 'email']
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -70,198 +69,241 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
-class FuncaoSerializer(ModelSerializer):
+class RoleSerializer(ModelSerializer):
     class Meta:
-        model = Funcao
+        model = Role
         fields = '__all__'
 
-class CreateIndisponibilidadeSerializer(ModelSerializer):
-    usuario = HiddenField(default=CurrentUserDefault())
+class CreateUnavailabilitySerializer(ModelSerializer):
+    user = HiddenField(default=CurrentUserDefault())
+    
     class Meta:
-        model = Indisponibilidade
-        fields = ('id','usuario','descricao', 'data_inicio', 'data_fim')
+        model = Unavailability
+        fields = ('id','user','description', 'start_date', 'end_date')
+    
     def create(self, validated_data):
-        indisponibilidade = Indisponibilidade.objects.create(**validated_data)
-        return indisponibilidade
+        unavailability = Unavailability.objects.create(**validated_data)
+        return unavailability
 
-class IndisponibilidadeSerializer(ModelSerializer):
+class UnavailabilitySerializer(ModelSerializer):
     class Meta:
-        model = Indisponibilidade
-        fields = ('id', 'usuario','descricao', 'data_inicio', 'data_fim')
+        model = Unavailability
+        fields = ('id','user','description', 'start_date', 'end_date')
 
-class ConviteSerializer(ModelSerializer):
-
+class OrganizationInvitationSerializer(ModelSerializer):
     class Meta:
-        model = Convite
+        model = OrganizationInvitation
         fields = '__all__'
+    
     def validate(self, data):
-        equipe = Equipe.objects.filter(id=data["equipe"].id).first()
-        usuario = Usuario.objects.filter(email=data["email_destinatario"]).first()
+        organization = Team.objects.filter(id=data["organization"].id).first()
+        user = User.objects.filter(email=data["recipient_email"]).first()
 
-        if not equipe:
+        if not organization:
             raise ValidationError({"equipe": "Equipe não encontrada."})
-        if not usuario:
+        if not user:
             raise ValidationError({"usuario": "Usuário não encontrado."})
-        if usuario and equipe.membros.filter(id=usuario.id).exists():
-            raise ValidationError({"email_destinatario": f"{usuario.first_name} já faz parte dessa equipe."})
+        if user and organization.members.filter(id=user.id).exists():
+            raise ValidationError({"email_destinatario": f"{user.first_name} já faz parte dessa organização."})
         
         return data
 
-class CreateSolicitacaoSerializer(ModelSerializer):
+class TeamInvitationSerializer(ModelSerializer):
+    class Meta:
+        model = TeamInvitation
+        fields = '__all__'
+    
+    def validate(self, data):
+        team = Team.objects.filter(id=data["team"].id).first()
+        user = User.objects.filter(email=data["recipient_email"]).first()
+
+        if not team:
+            raise ValidationError({"equipe": "Equipe não encontrada."})
+        if not user:
+            raise ValidationError({"usuario": "Usuário não encontrado."})
+        if user and team.members.filter(id=user.id).exists():
+            raise ValidationError({"email_destinatario": f"{user.first_name} já faz parte dessa equipe."})
+        
+        return data
+
+class CreateRequestSerializer(ModelSerializer):
 
     class Meta:
-        model = Solicitacao
+        model = Request
         fields = '__all__'
 
-class SolicitacaoSerializer(ModelSerializer):
-
-    usuario = UsuarioSerializer()
+class RequestSerializer(ModelSerializer):
+    usuario = UserSerializer()
 
     class Meta:
-        model = Solicitacao
+        model = Request
         fields = '__all__'
 
-class OrganizacaoSerializer(ModelSerializer):
-    administradores = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
-    membros = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
+class RetrieveOrganizationSerializer(ModelSerializer):
+    admins = UserMemberSerializer(many=True)
+    members = UserMemberSerializer(many=True)
+    invitations = OrganizationInvitationSerializer(many=True)
+    
     class Meta:
-        model = Organizacao
-        fields = ['id', 'nome', 'administradores', 'membros']
+        model = Organization
+        fields = ['id', 'name', 'code_access', 'admins', 'members', 'invitations']
+
+class OrganizationSerializer(ModelSerializer):
+    admins = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
+    members = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
+    
+    class Meta:
+        model = Organization
+        fields = ['id', 'name', 'code_access', 'admins', 'members']
+    
     def update(self, instance, validated_data):
-        administradores_data = validated_data.pop('administradores', None)
-        membros_data = validated_data.pop('membros', None)
+        admins_data = validated_data.pop('admins', None)
+        members_data = validated_data.pop('members', None)
         instance = super().update(instance, validated_data)
-        if administradores_data is not None:
-            instance.administradores.set(administradores_data)
-        if membros_data is not None:
-            instance.membros.set(membros_data)
+        if admins_data is not None:
+            instance.admins.set(admins_data)
+        if members_data is not None:
+            instance.members.set(members_data)
         return instance
 
-class CreateEquipeSerializer(ModelSerializer):
-    codigo_de_acesso = CharField(read_only=True)
+class CreateTeamSerializer(ModelSerializer):
+    code_access = CharField(read_only=True)
+    
     class Meta:
-        model = Equipe
-        fields = ['id', 'nome', 'codigo_de_acesso', 'organizacao']
+        model = Team
+        fields = ['id', 'name', 'code_access', 'organization']
+    
     def create(self, validated_data):
         user = self.context['request'].user
-        equipe = Equipe.objects.create(**validated_data)
-        equipe.administradores.add(user)
-        equipe.membros.add(user)
-        return equipe
+        team = Team.objects.create(**validated_data)
+        team.admins.add(user)
+        team.members.add(user)
+        return team
 
-class RetrieveEquipeSerializer(ModelSerializer):
-    administradores = UsuarioMembroSerializer(many=True)
-    funcoes = FuncaoSerializer(many=True)
-    membros = UsuarioMembroSerializer(many=True)
-    convites = ConviteSerializer(many=True)
+class RetrieveTeamSerializer(ModelSerializer):
+    admins = UserMemberSerializer(many=True)
+    roles = RoleSerializer(many=True)
+    members = UserMemberSerializer(many=True)
+    invitations = TeamInvitationSerializer(many=True)
+    
     class Meta:
-        model = Equipe
-        fields = ['id', 'nome', 'codigo_de_acesso', 'administradores', 'funcoes', 'membros', 'organizacao', 'convites']
+        model = Team
+        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members', 'organization', 'invitations']
 
-class EquipeSerializer(ModelSerializer):
-    administradores = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
-    funcoes = PrimaryKeyRelatedField(queryset=Funcao.objects.all(), many=True)
-    membros = PrimaryKeyRelatedField(queryset=Usuario.objects.all(), many=True)
+class TeamSerializer(ModelSerializer):
+    admins = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
+    roles = PrimaryKeyRelatedField(queryset=Role.objects.all(), many=True)
+    members = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
 
     class Meta:
-        model = Equipe
-        fields = ['id', 'nome', 'codigo_de_acesso', 'administradores', 'funcoes', 'membros']
+        model = Team
+        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members']
+    
     def update(self, instance, validated_data):
-        administradores_data = validated_data.pop('administradores', None)
-        funcoes_data = validated_data.pop('funcoes', None)
-        membros_data = validated_data.pop('membros', None)
+        admins_data = validated_data.pop('admins', None)
+        roles_data = validated_data.pop('roles', None)
+        members_data = validated_data.pop('members', None)
         instance = super().update(instance, validated_data)
-        if administradores_data is not None:
-            instance.administradores.set(administradores_data)
-        if funcoes_data is not None:
-            instance.funcoes.set(funcoes_data)
-        if membros_data is not None:
-            instance.membros.set(membros_data)
+        if admins_data is not None:
+            instance.admins.set(admins_data)
+        if roles_data is not None:
+            instance.roles.set(roles_data)
+        if members_data is not None:
+            instance.members.set(members_data)
         return instance
 
 
-class ParticipacaoEscalaSerializer(ModelSerializer):
-    funcoes = PrimaryKeyRelatedField(queryset=Funcao.objects.all(), many=True)
-    usuario = PrimaryKeyRelatedField(queryset=Usuario.objects.all())
+class ScheduleParticipationSerializer(ModelSerializer):
+    roles = PrimaryKeyRelatedField(queryset=Role.objects.all(), many=True)
+    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    
     class Meta:
-        model = ParticipacaoEscala
-        fields = ('funcoes','usuario')
+        model = ScheduleParticipation
+        fields = ('roles','user')
+    
     def create(self, validated_data):
-        funcoes_data = validated_data.pop('funcoes')
-        membro_data = validated_data.pop('usuario')
-        participacao_escala = ParticipacaoEscala.objects.create(**validated_data)
-        participacao_escala.funcoes.set(funcoes_data)
-        participacao_escala.membro = Usuario.objects.get(usuario=membro_data)
-        participacao_escala.save()
-        return participacao_escala
+        roles_data = validated_data.pop('roles')
+        member_data = validated_data.pop('user')
+        schedule_participation = ScheduleParticipation.objects.create(**validated_data)
+        schedule_participation.roles.set(roles_data)
+        schedule_participation.user = User.objects.get(user=member_data)
+        schedule_participation.save()
+        return schedule_participation
 
-class ParticipacaoEscalaRetrieveSerializer(ModelSerializer):
-    funcoes = FuncaoSerializer(many=True)
-    usuario = UsuarioMembroSerializer()
+class RetrieveScheduleParticipationSerializer(ModelSerializer):
+    roles = RoleSerializer(many=True)
+    user = UserMemberSerializer()
+    
     class Meta:
-        model = ParticipacaoEscala
-        fields = ('funcoes','usuario', 'confirmacao')
+        model = ScheduleParticipation
+        fields = ('id', 'roles','user', 'confirmation')
 
-class ParticipacaoEscalaUpdateSerializer(ModelSerializer):
-    funcoes = PrimaryKeyRelatedField(queryset=Funcao.objects.all(), many=True)
+class UpdateScheduleParticipationSerializer(ModelSerializer):
+    roles = PrimaryKeyRelatedField(queryset=Role.objects.all(), many=True)
+    
     class Meta:
-        model = ParticipacaoEscala
-        fields = ('funcoes','confirmacao')
+        model = ScheduleParticipation
+        fields = ('roles','confirmation')
+    
     def update(self, instance, validated_data):
-        funcoes_data = validated_data.pop('funcoes')
+        roles_data = validated_data.pop('roles')
         instance = super().update(instance, validated_data)
-        instance.funcoes.set(funcoes_data)
+        instance.roles.set(roles_data)
         return instance
 
-class CreateEscalaSerializer(ModelSerializer):
-    participacoes = ParticipacaoEscalaSerializer(many=True)
+class CreateScheduleSerializer(ModelSerializer):
+    participations = ScheduleParticipationSerializer(many=True)
+    
     class Meta:
-        model = Escala
+        model = Schedule
         fields = '__all__'
+    
     def validate(self, data):
-        participacoes = data['participacoes']
-        for participacao in participacoes:
-            usuario = participacao['usuario']
-            indisponibilidades = usuario.indisponibilidades.filter(data_inicio__lte=data['data'])
-            if indisponibilidades.exists():
-                raise ValidationError(f'O usuário {usuario} está indisponível nesta data.')
+        participations = data['participations']
+        for participation in participations:
+            user = participation['user']
+            unavailability = user.unavailability.filter(start_date__lte=data['date'])
+            # if unavailability.exists():
+                # raise ValidationError(f'O usuário {user} está indisponível nesta data.')
             # if ParticipacaoEscala.objects.filter(escala=data['escala'], usuario=data['usuario']).exists():
                 # raise ValidationError('Este usuário já está participando desta escala.')
         return data
-    def add_participacoes(self, escala, participacoes):
-        for participacao in participacoes:
-            funcoes_data = participacao.pop('funcoes')
-            usuario_data = participacao.pop('usuario').id
+    
+    def add_participations(self, schedule, participations):
+        for participation in participations:
+            roles_data = participation.pop('roles')
+            user_data = participation.pop('user').id
 
             try:
-                usuario = Usuario.objects.get(id=usuario_data)
-            except Usuario.DoesNotExist:
-                raise ValidationError(f"O usuario {usuario_data} não faz parte da equipe {escala.equipe.nome}.")
+                user = User.objects.get(id=user_data)
+            except User.DoesNotExist:
+                raise ValidationError(f"O usuario {user_data} não faz parte da equipe {schedule.team.name}.")
 
-            participacao_escala = ParticipacaoEscala.objects.create(escala=escala, usuario=usuario)
-            participacao_escala.funcoes.set(funcoes_data)
-            participacao_escala.save()
+            schedule_participation = ScheduleParticipation.objects.create(schedule=schedule, user=user)
+            schedule_participation.roles.set(roles_data)
+            schedule_participation.save()
+    
     def create(self, validated_data):
-        participacoes = validated_data.pop('participacoes')
-
-        escala = Escala.objects.create(**validated_data)
-
-        self.add_participacoes(escala, participacoes)
-
-        return escala
+        participations = validated_data.pop('participations')
+        schedule = Schedule.objects.create(**validated_data)
+        self.add_participations(schedule, participations)
+        return schedule
+    
     def update(self, instance, validated_data):
-        participacoes_data = validated_data.pop('participacoes')
+        participations_data = validated_data.pop('participations')
         instance = super().update(instance, validated_data)
-        instance.participacoes.all().delete()
-        self.add_participacoes(instance, participacoes_data)
+        instance.participations.all().delete()
+        self.add_participations(instance, participations_data)
         return instance
+    
     # def to_representation(self, instance):
     #     data = super().to_representation(instance)
     #     data['participacoes'] = ParticipacaoEscalaRetrieveSerializer(instance.participacoes.all(), many=True).data
     #     return data
 
-class RetrieveEscalaSerializer(ModelSerializer):
-    participacoes = ParticipacaoEscalaRetrieveSerializer(many=True)
+class RetrieveScheduleSerializer(ModelSerializer):
+    participations = RetrieveScheduleParticipationSerializer(many=True)
+    
     class Meta:
-        model = Escala
+        model = Schedule
         fields = '__all__'
