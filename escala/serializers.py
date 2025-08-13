@@ -123,6 +123,8 @@ class TeamInvitationSerializer(ModelSerializer):
             raise ValidationError({"user": "Usuário não encontrado."})
         if user and team.members.filter(id=user.id).exists():
             raise ValidationError({"recipient_email": f"{user.first_name} já faz parte dessa equipe."})
+        if user and not Organization.objects.filter(members__id=user.id).exists():
+            raise ValidationError({"recipient_email": f"{user.first_name} não faz parte da organização."})
         
         return data
 
