@@ -73,7 +73,7 @@ class OrganizationViewSet(ModelViewSet):
         if not user_id:
             return Response({"error": "O campo 'user_id' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
         if not organization.members.filter(id=user_id).exists():
-            return Response({"message": "Usuário não encontrado na equipe."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "Usuário não encontrado na organização."}, status=status.HTTP_404_NOT_FOUND)
         organization.members.remove(user_id)
         if organization.admins.filter(id=user_id).exists():
             organization.admins.remove(user_id)

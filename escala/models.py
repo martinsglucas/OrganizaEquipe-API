@@ -103,7 +103,7 @@ class ScheduleParticipation(models.Model):
         verbose_name_plural = 'Participations'
 
     def __str__(self):
-        return f'{self.escala.nome} - {self.usuario.first_name}'
+        return f'{self.schedule.name} - {self.user.first_name}'
 
 class TeamInvitation(models.Model):
     recipient_email = models.EmailField(max_length=100)

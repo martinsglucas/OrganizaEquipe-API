@@ -100,11 +100,11 @@ class OrganizationInvitationSerializer(ModelSerializer):
         user = User.objects.filter(email=data["recipient_email"]).first()
 
         if not organization:
-            raise ValidationError({"equipe": "Equipe não encontrada."})
+            raise ValidationError({"team": "Equipe não encontrada."})
         if not user:
-            raise ValidationError({"usuario": "Usuário não encontrado."})
+            raise ValidationError({"user": "Usuário não encontrado."})
         if user and organization.members.filter(id=user.id).exists():
-            raise ValidationError({"email_destinatario": f"{user.first_name} já faz parte dessa organização."})
+            raise ValidationError({"recipient_email": f"{user.first_name} já faz parte dessa organização."})
         
         return data
 
@@ -118,11 +118,11 @@ class TeamInvitationSerializer(ModelSerializer):
         user = User.objects.filter(email=data["recipient_email"]).first()
 
         if not team:
-            raise ValidationError({"equipe": "Equipe não encontrada."})
+            raise ValidationError({"team": "Equipe não encontrada."})
         if not user:
-            raise ValidationError({"usuario": "Usuário não encontrado."})
+            raise ValidationError({"user": "Usuário não encontrado."})
         if user and team.members.filter(id=user.id).exists():
-            raise ValidationError({"email_destinatario": f"{user.first_name} já faz parte dessa equipe."})
+            raise ValidationError({"recipient_email": f"{user.first_name} já faz parte dessa equipe."})
         
         return data
 
@@ -133,7 +133,7 @@ class CreateRequestSerializer(ModelSerializer):
         fields = '__all__'
 
 class RequestSerializer(ModelSerializer):
-    usuario = UserSerializer()
+    user = UserSerializer()
 
     class Meta:
         model = Request

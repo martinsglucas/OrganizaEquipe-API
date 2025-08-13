@@ -13,7 +13,7 @@ class UnavailabilityViewSet(ModelViewSet):
         date = self.request.query_params.get('date', None)
         
         if user_only:
-            queryset = queryset.filter(usuario=self.request.user)
+            queryset = queryset.filter(user=self.request.user)
         if date:
             try:
                 date_obj = datetime.strptime(date, '%Y-%m-%d').date()
