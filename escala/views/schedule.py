@@ -1,6 +1,7 @@
 from rest_framework.viewsets import ModelViewSet
 from escala.models import Schedule
 from escala.serializers import CreateScheduleSerializer, RetrieveScheduleSerializer
+from django.utils import timezone
 
 class ScheduleViewSet(ModelViewSet):
     queryset = Schedule.objects.all()
@@ -8,6 +9,7 @@ class ScheduleViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user_only = self.request.query_params.get('userOnly', 'false').lower() == 'true'
+        past = self.request.query_params.get('past', 'false').lower() == 'true'
 
         if user_only:
             queryset = (
@@ -18,7 +20,13 @@ class ScheduleViewSet(ModelViewSet):
                 )
             ).distinct()
 
-        return queryset.order_by('date', 'hour')
+        if not past:
+            queryset = queryset.filter(date__gte=timezone.now().date())
+            return queryset.order_by('date', 'hour')
+        else:
+            queryset = queryset.filter(date__lte=timezone.now().date())
+            return queryset.order_by('-date', '-hour')
+
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
