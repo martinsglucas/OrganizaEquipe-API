@@ -305,6 +305,7 @@ class CreateScheduleSerializer(ModelSerializer):
 
 class RetrieveScheduleSerializer(ModelSerializer):
     participations = RetrieveScheduleParticipationSerializer(many=True)
+    team = RetrieveTeamSerializer()
     
     class Meta:
         model = Schedule
