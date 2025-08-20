@@ -15,6 +15,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['organizaequipe-api.onrender.com']
 
+CSRF_TRUSTED_ORIGINS = ["https://organizaequipe-api.onrender.com"]
+
+
 
 # Application definition
 
