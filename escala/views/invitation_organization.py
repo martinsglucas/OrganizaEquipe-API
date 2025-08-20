@@ -1,10 +1,14 @@
 from rest_framework.viewsets import ModelViewSet
 from escala.models import OrganizationInvitation
-from escala.serializers import OrganizationInvitationSerializer
+from escala.serializers import OrganizationInvitationSerializer, RetrieveOrganizationInvitationSerializer
 
 class OrganizationInvitationViewSet(ModelViewSet):
   queryset = OrganizationInvitation.objects.all()
-  serializer_class = OrganizationInvitationSerializer
+  
+  def get_serializer_class(self):
+    if self.action in ['list', 'retrieve']:
+      return RetrieveOrganizationInvitationSerializer
+    return OrganizationInvitationSerializer
 
   def get_queryset(self):
     queryset = super().get_queryset()

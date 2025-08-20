@@ -167,6 +167,13 @@ class OrganizationSerializer(ModelSerializer):
         if members_data is not None:
             instance.members.set(members_data)
         return instance
+    
+class RetrieveOrganizationInvitationSerializer(ModelSerializer):
+    organization = RetrieveOrganizationSerializer()
+
+    class Meta:
+        model = OrganizationInvitation
+        fields = '__all__'
 
 class CreateTeamSerializer(ModelSerializer):
     code_access = CharField(read_only=True)
@@ -214,6 +221,12 @@ class TeamSerializer(ModelSerializer):
             instance.members.set(members_data)
         return instance
 
+class RetrieveTeamInvitationSerializer(ModelSerializer):
+    team = RetrieveTeamSerializer()
+
+    class Meta:
+        model = TeamInvitation
+        fields = '__all__'
 
 class ScheduleParticipationSerializer(ModelSerializer):
     roles = PrimaryKeyRelatedField(queryset=Role.objects.all(), many=True)
