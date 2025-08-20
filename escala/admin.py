@@ -4,19 +4,6 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from .models import User, Role, Team, Unavailability, Schedule, ScheduleParticipation, Organization, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth.models import Group, Permission
 
-group, created = Group.objects.get_or_create(name='Users')
-permissions = Permission.objects.filter(codename__in=[
-    'add_organization', 'change_organization', 'delete_organization', 'view_organization', 
-    'add_team', 'change_team', 'delete_team', 'view_team', 
-    'add_role', 'change_role', 'delete_role', 'view_role', 
-    'add_unavailability', 'change_unavailability', 'delete_unavailability', 'view_unavailability', 
-    'add_schedule', 'change_schedule', 'delete_schedule', 'view_schedule', 
-    'add_scheduleparticipation', 'change_scheduleparticipation', 'delete_scheduleparticipation', 'view_scheduleparticipation',
-    'add_teaminvitation', 'change_teaminvitation', 'delete_teaminvitation', 'view_teaminvitation',
-    'add_organizationinvitation', 'change_organizationinvitation', 'delete_organizationinvitation', 'view_organizationinvitation',
-    'add_request', 'change_request', 'delete_request', 'view_request',
-    'add_user', 'change_user', 'delete_user', 'view_user'])
-group.permissions.set(permissions)
 
 class UserCreationForm(UserCreationForm):
     class Meta:
