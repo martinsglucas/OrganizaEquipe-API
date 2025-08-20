@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from datetime import datetime
+from django.db.models import Q
 
 class TeamViewSet(ModelViewSet):
     queryset = Team.objects.all()
@@ -84,6 +86,32 @@ class TeamViewSet(ModelViewSet):
         team.save()
 
         return Response({"message": "Usuário removido com sucesso!"}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "data para verificar a disponibilidade"},
+                },
+                "required": ["date"]
+            }
+        },
+        responses={200: {"description": "Lista de membros disponíveis da equipe"}},
+    )
+    @action(detail=True, methods=['post'])
+    def get_available_members(self, request, pk=None):
+        team = get_object_or_404(Team, pk=pk)
+        date = request.data.get("date")
+        date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+
+        unavailable_members = team.members.filter(
+            Q(unavailability__start_date=date_obj) | Q(schedules__schedule__date=date_obj)
+        ).distinct()
+
+        members = team.members.exclude(pk__in=unavailable_members)
+        
+        return Response({"available_members": members.values("id", "first_name"), "unavailable_members": unavailable_members.values("id", "first_name")}, status=status.HTTP_200_OK)
         
     # permission_classes = [AllowPostWithoutAuthentication]
     # http_method_names = ['get', 'post', 'put', 'delete']
