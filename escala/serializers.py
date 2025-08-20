@@ -96,11 +96,11 @@ class OrganizationInvitationSerializer(ModelSerializer):
         fields = '__all__'
     
     def validate(self, data):
-        organization = Team.objects.filter(id=data["organization"].id).first()
+        organization = Organization.objects.filter(id=data["organization"].id).first()
         user = User.objects.filter(email=data["recipient_email"]).first()
 
         if not organization:
-            raise ValidationError({"team": "Equipe não encontrada."})
+            raise ValidationError({"organization": "Organização não encontrada."})
         if not user:
             raise ValidationError({"user": "Usuário não encontrado."})
         if user and organization.members.filter(id=user.id).exists():
