@@ -2,6 +2,8 @@ from rest_framework.viewsets import ModelViewSet
 from escala.models import Schedule
 from escala.serializers import CreateScheduleSerializer, RetrieveScheduleSerializer
 from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework import status
 
 class ScheduleViewSet(ModelViewSet):
     queryset = Schedule.objects.all()
@@ -43,3 +45,14 @@ class ScheduleViewSet(ModelViewSet):
         return super().get_serializer
     # permission_classes = [AllowPostWithoutAuthentication]
     # http_method_names = ['get', 'post', 'put', 'delete']
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        schedule = serializer.save()
+
+        output_serializer = RetrieveScheduleSerializer(
+            schedule, context=self.get_serializer_context()
+        )
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
