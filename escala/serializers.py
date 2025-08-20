@@ -234,7 +234,7 @@ class ScheduleParticipationSerializer(ModelSerializer):
     
     class Meta:
         model = ScheduleParticipation
-        fields = ('roles','user')
+        fields = ('id', 'roles','user')
     
     def create(self, validated_data):
         roles_data = validated_data.pop('roles')
