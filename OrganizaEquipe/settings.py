@@ -13,7 +13,7 @@ SECRET_KEY = 'django-insecure--*_votdu(+_ka2uik(%923cj5ewqm(juw8(=f3&7v)v$x(s66u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['https://organizaequipe-api.onrender.com/']
+ALLOWED_HOSTS = ['organizaequipe-api.onrender.com']
 
 
 # Application definition
