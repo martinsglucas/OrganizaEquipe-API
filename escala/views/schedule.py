@@ -9,7 +9,7 @@ class ScheduleViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user_only = self.request.query_params.get('userOnly', 'false').lower() == 'true'
-        past = self.request.query_params.get('past', 'false').lower() == 'true'
+        filter = self.request.query_params.get('filter', 'all').lower()
 
         if user_only:
             queryset = (
@@ -20,12 +20,19 @@ class ScheduleViewSet(ModelViewSet):
                 )
             ).distinct()
 
-        if not past:
-            queryset = queryset.filter(date__gte=timezone.now().date())
-            return queryset.order_by('date', 'hour')
-        else:
-            queryset = queryset.filter(date__lte=timezone.now().date())
-            return queryset.order_by('-date', '-hour')
+        timezone.activate('America/Sao_Paulo')
+        # local_time = timezone.localtime(timezone.now()).time()
+        local_date = timezone.localtime(timezone.now()).date()
+        
+        match (filter):
+            case 'next':
+                queryset = queryset.filter(date__gte=local_date)
+                return queryset.order_by('date', 'hour')
+            case 'past':
+                queryset = queryset.filter(date__lt=local_date)
+                return queryset.order_by('-date', '-hour')
+            case _:
+                return queryset
 
     
     def get_serializer_class(self):
