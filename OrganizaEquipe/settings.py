@@ -4,20 +4,25 @@ from datetime import timedelta
 import dj_database_url
 import os
 
+def _split_env_list(name, default=""):
+    return [p.strip() for p in os.environ.get(name, default).split(",") if p.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--*_votdu(+_ka2uik(%923cj5ewqm(juw8(=f3&7v)v$x(s66u'
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['organizaequipe-api.onrender.com']
+ALLOWED_HOSTS = _split_env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 
-CSRF_TRUSTED_ORIGINS = ["https://organizaequipe-api.onrender.com"]
+# CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOWED_ORIGINS = _split_env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 
+CSRF_TRUSTED_ORIGINS = _split_env_list("CSRF_TRUSTED_ORIGINS")
 
 # Application definition
 
@@ -73,7 +78,7 @@ WSGI_APPLICATION = 'OrganizaEquipe.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-      default='postgresql://organizaequipe_database_user:b1mhIFEPW0l0IdenPoDvSp68G3tm3qoV@dpg-d2it17er433s73e7hgag-a.oregon-postgres.render.com/organizaequipe_database',
+      default=os.environ.get("DATABASE_URL"),
       conn_max_age=600
     )
 }
@@ -147,12 +152,11 @@ SPECTACULAR_SETTINGS = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    # "ROTATE_REFRESH_TOKENS": True,
+    # "BLACKLIST_AFTER_ROTATION": True,
+    # "AUTH_COOKIE_SECURE": False,  # Apenas via HTTPS em produção
+    # "AUTH_COOKIE_HTTP_ONLY": True,  # Protege contra XSS
+    # "AUTH_COOKIE_SAMESITE": "Lax",  # Protege contra CSRF
 }
-
-# CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOWED_ORIGINS = [
-    "https://organizaequipe.onrender.com/",
-]
 
 AUTH_USER_MODEL = 'escala.User'
