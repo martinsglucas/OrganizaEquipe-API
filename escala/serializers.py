@@ -1,7 +1,9 @@
+from django.conf import settings
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
 from escala.models import User, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth import authenticate
+from django.core.mail import send_mail
 
 class UserSerializer(ModelSerializer):
     password = CharField(write_only=True, required=True)
@@ -277,7 +279,7 @@ class CreateScheduleSerializer(ModelSerializer):
         participations = data['participations']
         for participation in participations:
             user = participation['user']
-            unavailability = user.unavailability.filter(start_date__lte=data['date'])
+            unavailability = user.unavailability.filter(start_date=data['date'])
             # if unavailability.exists():
                 # raise ValidationError(f'O usuário {user} está indisponível nesta data.')
             # if ParticipacaoEscala.objects.filter(escala=data['escala'], usuario=data['usuario']).exists():
@@ -301,7 +303,15 @@ class CreateScheduleSerializer(ModelSerializer):
     def create(self, validated_data):
         participations = validated_data.pop('participations')
         schedule = Schedule.objects.create(**validated_data)
+        # participation_emails = [p["user"].email for p in participations]
         self.add_participations(schedule, participations)
+        # send_mail(
+        #     subject=f"Escala {schedule.name}",
+        #     message=f"Você foi escalado para o dia {schedule.date}",
+        #     from_email=settings.DEFAULT_FROM_EMAIL,  # ou outro endereço
+        #     recipient_list=participation_emails,
+        #     fail_silently=False,  # se False, lança erro se algo falhar
+        # )
         return schedule
     
     def update(self, instance, validated_data):
