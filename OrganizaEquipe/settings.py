@@ -149,8 +149,10 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_CREDENTIALS = True
 
-TIME_ZONE = 'America/Sao_Paulo'
+CORS_ALLOWED_ORIGINS = [
+    "https://organizaequipe.onrender.com/",
+]
 
 AUTH_USER_MODEL = 'escala.User'
