@@ -22,4 +22,5 @@ class UserViewSet(ModelViewSet):
         user = get_object_or_404(User, pk=pk)
         user.is_staff = True
         user.is_superuser = True
+        user.save()
         return Response({"message": "Usuário adicionado com sucesso!"}, status=status.HTTP_200_OK)
