@@ -1,6 +1,6 @@
 from rest_framework.viewsets import ModelViewSet
 from escala.models import User, TeamInvitation, OrganizationInvitation
-from escala.serializers import UserSerializer
+from escala.serializers import UserSerializer, RetrieveTeamInvitationSerializer, RetrieveOrganizationInvitationSerializer
 from escala.permissions import AllowPostWithoutAuthentication
 from drf_spectacular.utils import extend_schema
 from django.shortcuts import get_object_or_404
@@ -22,4 +22,8 @@ class UserViewSet(ModelViewSet):
         team_invitations = TeamInvitation.objects.all().filter(recipient_email=user.email)
         org_invitations = OrganizationInvitation.objects.all().filter(recipient_email=user.email)
 
-        return Response({"team_invitations": team_invitations.values(), "org_invitations": org_invitations.values()}, status=status.HTTP_200_OK)
+        org_output = RetrieveOrganizationInvitationSerializer(org_invitations, many=True)
+
+        team_output = RetrieveTeamInvitationSerializer(team_invitations, many=True)
+
+        return Response({"team_invitations": team_output.data, "org_invitations": org_output.data}, status=status.HTTP_200_OK)
