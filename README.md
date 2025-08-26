@@ -107,7 +107,7 @@ Siga os passos abaixo para configurar e rodar o projeto localmente:
 5. Execute as migrações:
 
     ```bash
-    python manaage.py migrate
+    python manage.py migrate
     ```
 
 6. Crie um superusuário (opcional, mas recomendado):
@@ -130,6 +130,6 @@ Siga os passos abaixo para configurar e rodar o projeto localmente:
 
 A documentação da API pode ser acessada em:
 
-Swagger UI: http://localhost:8000/api/swagger/
+- Swagger UI: http://localhost:8000/api/swagger/
 
-Redoc: http://localhost:8000/api/redoc/
+- Redoc: http://localhost:8000/api/redoc/
