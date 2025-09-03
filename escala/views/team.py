@@ -7,7 +7,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
-from django.db.models import Q
 
 class TeamViewSet(ModelViewSet):
     queryset = Team.objects.all()
@@ -105,13 +104,23 @@ class TeamViewSet(ModelViewSet):
         date = request.data.get("date")
         date_obj = datetime.strptime(date, '%Y-%m-%d').date()
 
-        unavailable_members = team.members.filter(
-            Q(unavailability__start_date=date_obj) | Q(schedules__schedule__date=date_obj)
-        ).distinct()
+        unavailable_members = team.members.filter(unavailability__start_date=date_obj).distinct()
+
+        assigned_members = team.members.filter(schedules__schedule__date=date_obj).distinct()
 
         members = team.members.exclude(pk__in=unavailable_members)
+
+        members = members.exclude(pk__in=assigned_members)
         
-        return Response({"available_members": members.values("id", "first_name"), "unavailable_members": unavailable_members.values("id", "first_name")}, status=status.HTTP_200_OK)
+        
+        return Response(
+            {
+                "available_members": members.values("id", "first_name"), 
+                "unavailable_members": unavailable_members.values("id", "first_name"),
+                "assigned_members": assigned_members.values("id", "first_name")
+            }, 
+            status=status.HTTP_200_OK)
+
         
     # permission_classes = [AllowPostWithoutAuthentication]
     # http_method_names = ['get', 'post', 'put', 'delete']
