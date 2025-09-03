@@ -177,10 +177,11 @@ class RetrieveOrganizationInvitationSerializer(ModelSerializer):
 
 class CreateTeamSerializer(ModelSerializer):
     code_access = CharField(read_only=True)
+    admins = UserMemberSerializer(many=True, read_only=True)
     
     class Meta:
         model = Team
-        fields = ['id', 'name', 'code_access', 'organization']
+        fields = ['id', 'name', 'code_access', 'organization', 'admins']
     
     def create(self, validated_data):
         user = self.context['request'].user
