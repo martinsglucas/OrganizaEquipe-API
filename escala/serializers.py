@@ -196,14 +196,23 @@ class CreateTeamSerializer(ModelSerializer):
         return team
 
 class RetrieveTeamSerializer(ModelSerializer):
-    admins = UserMemberSerializer(many=True)
-    roles = RoleSerializer(many=True)
-    members = UserMemberSerializer(many=True)
+    admins = SerializerMethodField()
+    roles = SerializerMethodField()
+    members = SerializerMethodField()
     invitations = TeamInvitationSerializer(many=True)
     
     class Meta:
         model = Team
         fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members', 'organization', 'invitations']
+    
+    def get_admins(self, obj):
+        return UserMemberSerializer(obj.admins.order_by("first_name"), many=True).data
+    
+    def get_roles(self, obj):
+        return RoleSerializer(obj.roles.order_by("name"), many=True).data
+    
+    def get_members(self, obj):
+        return UserMemberSerializer(obj.members.order_by("first_name"), many=True).data
 
 class TeamSerializer(ModelSerializer):
     admins = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
