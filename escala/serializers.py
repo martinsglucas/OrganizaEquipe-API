@@ -261,12 +261,15 @@ class ScheduleParticipationSerializer(ModelSerializer):
         return schedule_participation
 
 class RetrieveScheduleParticipationSerializer(ModelSerializer):
-    roles = RoleSerializer(many=True)
+    roles = SerializerMethodField()
     user = UserMemberSerializer()
     
     class Meta:
         model = ScheduleParticipation
         fields = ('id', 'roles','user', 'confirmation')
+
+    def get_roles(self, obj):
+        return RoleSerializer(obj.roles.order_by("name"), many=True).data
 
 class UpdateScheduleParticipationSerializer(ModelSerializer):
     roles = PrimaryKeyRelatedField(queryset=Role.objects.all(), many=True)
@@ -332,9 +335,12 @@ class CreateScheduleSerializer(ModelSerializer):
     #     return data
 
 class RetrieveScheduleSerializer(ModelSerializer):
-    participations = RetrieveScheduleParticipationSerializer(many=True)
+    participations = SerializerMethodField()
     team = RetrieveTeamSerializer()
     
     class Meta:
         model = Schedule
         fields = '__all__'
+
+    def get_participations(self, obj):
+        return RetrieveScheduleParticipationSerializer(obj.participations.order_by("user__first_name"), many=True).data
