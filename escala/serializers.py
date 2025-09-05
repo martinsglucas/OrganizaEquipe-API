@@ -129,7 +129,6 @@ class TeamInvitationSerializer(ModelSerializer):
         return data
 
 class CreateRequestSerializer(ModelSerializer):
-
     class Meta:
         model = Request
         fields = '__all__'
@@ -142,13 +141,19 @@ class RequestSerializer(ModelSerializer):
         fields = '__all__'
 
 class RetrieveOrganizationSerializer(ModelSerializer):
-    admins = UserMemberSerializer(many=True)
-    members = UserMemberSerializer(many=True)
+    admins = SerializerMethodField()
+    members = SerializerMethodField()
     invitations = OrganizationInvitationSerializer(many=True)
     
     class Meta:
         model = Organization
         fields = ['id', 'name', 'code_access', 'admins', 'members', 'invitations']
+    
+    def get_admins(self, obj):
+        return UserMemberSerializer(obj.admins.order_by("first_name"), many=True).data
+    
+    def get_members(self, obj):
+        return UserMemberSerializer(obj.members.order_by("first_name"), many=True).data
 
 class OrganizationSerializer(ModelSerializer):
     admins = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
