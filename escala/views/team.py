@@ -117,7 +117,7 @@ class TeamViewSet(ModelViewSet):
             {
                 "available_members": members.values("id", "first_name"), 
                 "unavailable_members": unavailable_members.values("id", "first_name"),
-                "assigned_members": assigned_members.values("id", "first_name")
+                "assigned_members": assigned_members.values("id", "first_name", "schedules__schedule__name", "schedules__schedule__team__name")
             }, 
             status=status.HTTP_200_OK)
 
