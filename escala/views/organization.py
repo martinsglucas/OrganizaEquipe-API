@@ -79,6 +79,13 @@ class OrganizationViewSet(ModelViewSet):
             organization.admins.remove(user_id)
         organization.save()
 
+        for team in organization.teams.all():
+            if team.members.filter(id=user_id).exists():
+                team.members.remove(user_id)
+            if team.admins.filter(id=user_id).exists():
+                team.admins.remove(user_id)
+            team.save()
+
         return Response({"message": "Usuário removido com sucesso!"}, status=status.HTTP_200_OK)
 	# permission_classes = [AllowPostWithoutAuthentication]
 	# http_method_names = ['get', 'post', 'put', 'delete']
