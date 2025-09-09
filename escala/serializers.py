@@ -249,7 +249,7 @@ class ScheduleParticipationSerializer(ModelSerializer):
     
     class Meta:
         model = ScheduleParticipation
-        fields = ('id', 'roles','user')
+        fields = ('id', 'roles', 'user', 'confirmation')
     
     def create(self, validated_data):
         roles_data = validated_data.pop('roles')
@@ -279,9 +279,10 @@ class UpdateScheduleParticipationSerializer(ModelSerializer):
         fields = ('roles','confirmation')
     
     def update(self, instance, validated_data):
-        roles_data = validated_data.pop('roles')
+        roles_data = validated_data.pop('roles', None)
         instance = super().update(instance, validated_data)
-        instance.roles.set(roles_data)
+        if roles_data is not None:
+            instance.roles.set(roles_data)
         return instance
 
 class CreateScheduleSerializer(ModelSerializer):
@@ -306,13 +307,14 @@ class CreateScheduleSerializer(ModelSerializer):
         for participation in participations:
             roles_data = participation.pop('roles')
             user_data = participation.pop('user').id
+            confirmation = participation.pop('confirmation', False)
 
             try:
                 user = User.objects.get(id=user_data)
             except User.DoesNotExist:
                 raise ValidationError(f"O usuario {user_data} não faz parte da equipe {schedule.team.name}.")
 
-            schedule_participation = ScheduleParticipation.objects.create(schedule=schedule, user=user)
+            schedule_participation = ScheduleParticipation.objects.create(schedule=schedule, user=user, confirmation=confirmation)
             schedule_participation.roles.set(roles_data)
             schedule_participation.save()
     
