@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from escala.serializers import CustomTokenObtainPairSerializer
 from django.conf import settings
@@ -58,21 +58,20 @@ class CookieTokenRefreshView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
+
         try:
-            token = RefreshToken(refresh_token)
-            access_token = str(token.access_token)
+            serializer.is_valid(raise_exception=True)
         except TokenError as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
-        response = Response({"access": access_token}, status=status.HTTP_200_OK)
+        access_token = serializer.validated_data["access"]
+        new_refresh = serializer.validated_data.get("refresh", refresh_token)
 
-        new_refresh = str(token)
+        response = Response({"access": str(access_token)}, status=status.HTTP_200_OK)
         response.set_cookie(
             key="refreshToken",
-            value=new_refresh,
+            value=str(new_refresh),
             httponly=True,
             secure=not settings.DEBUG,
             samesite="None",
