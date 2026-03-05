@@ -18,7 +18,10 @@ DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = _split_env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = _split_env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+CORS_ALLOWED_ORIGINS = _split_env_list(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,https://organizaequipe.onrender.com"
+)
 CSRF_TRUSTED_ORIGINS = _split_env_list("CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
