@@ -1,5 +1,5 @@
 from .user import UserViewSet
-from .customTokenObtainPairView import CustomTokenObtainPairView
+from .customTokenObtainPairView import CustomTokenObtainPairView, CookieTokenRefreshView, LogoutView
 from .role import RoleViewSet
 from .organization import OrganizationViewSet
 from .team import TeamViewSet
