@@ -34,7 +34,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             value=refresh_token,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Lax",
+            samesite="None",
             max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
             path="/api/token/",
         )
@@ -75,7 +75,7 @@ class CookieTokenRefreshView(APIView):
             value=new_refresh,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Lax",
+            samesite="None",
             max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
             path="/api/token/",
         )
