@@ -4,6 +4,7 @@ from escala.serializers import CreateScheduleSerializer, RetrieveScheduleSeriali
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
+from ..fcm import send_schedule_notification
 
 class ScheduleViewSet(ModelViewSet):
     queryset = Schedule.objects.all()
@@ -50,6 +51,14 @@ class ScheduleViewSet(ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         schedule = serializer.save()
+
+        tokens = [
+            p.user.fcm_token
+            for p in schedule.participations.all()
+            if p.user.fcm_token
+        ]
+
+        send_schedule_notification(fcm_tokens=tokens, schedule_name=schedule.name, schedule_date=schedule.date)
 
         output_serializer = RetrieveScheduleSerializer(
             schedule, context=self.get_serializer_context()
