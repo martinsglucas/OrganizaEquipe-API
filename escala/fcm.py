@@ -32,13 +32,12 @@ def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedu
 
     message = messaging.MulticastMessage(
         tokens=fcm_tokens,
-        notification=messaging.Notification(
-            title="📅 Nova escala criada!",
-            body=f"Você foi escalado para: {schedule_name} em {schedule_date}",
-        ),
         data={
+            "title": "📅 Nova escala criada!",
+            "body": f"Você foi escalado para: {schedule_name} em {schedule_date}",
             "type": "new_schedule",
             "schedule_name": schedule_name,
+            "schedule_date": str(schedule_date),
         }
     )
 
