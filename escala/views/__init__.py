@@ -9,3 +9,4 @@ from .participation import ScheduleParticipationViewSet
 from .invitation_team import TeamInvitationViewSet
 from .invitation_organization import OrganizationInvitationViewSet
 from .request import RequestViewSet
+from .push_subscription import PushSubscriptionViewSet

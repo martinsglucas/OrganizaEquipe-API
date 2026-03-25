@@ -39,6 +39,44 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.first_name
 
+
+class PushSubscription(models.Model):
+    PERMISSION_DEFAULT = "default"
+    PERMISSION_GRANTED = "granted"
+    PERMISSION_DENIED = "denied"
+    PERMISSION_CHOICES = [
+        (PERMISSION_DEFAULT, "Default"),
+        (PERMISSION_GRANTED, "Granted"),
+        (PERMISSION_DENIED, "Denied"),
+    ]
+
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+    )
+    token = models.CharField(max_length=255, unique=True)
+    platform = models.CharField(max_length=50, blank=True)
+    browser = models.CharField(max_length=100, blank=True)
+    device_label = models.CharField(max_length=150, blank=True)
+    is_ios = models.BooleanField(default=False)
+    is_standalone = models.BooleanField(default=False)
+    permission = models.CharField(
+        max_length=20,
+        choices=PERMISSION_CHOICES,
+        default=PERMISSION_DEFAULT,
+    )
+    is_active = models.BooleanField(default=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-last_seen_at", "-updated_at"]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.device_label or self.platform or 'device'}"
+
 def generate_unique_access_code():
     while True:
         code = uuid.uuid4().hex[:6].upper()

@@ -18,6 +18,7 @@ from escala.views import (
     TeamInvitationViewSet,
     OrganizationInvitationViewSet,
     RequestViewSet,
+    PushSubscriptionViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -31,6 +32,7 @@ router.register(r'participations', ScheduleParticipationViewSet)
 router.register(r'team_invitations', TeamInvitationViewSet)
 router.register(r'organization_invitations', OrganizationInvitationViewSet)
 router.register(r'requests', RequestViewSet)
+router.register(r'push_subscriptions', PushSubscriptionViewSet, basename='push-subscriptions')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

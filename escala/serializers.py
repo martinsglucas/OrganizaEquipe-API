@@ -1,6 +1,6 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
-from escala.models import User, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
+from escala.models import User, PushSubscription, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth import authenticate
 
 class UserSerializer(ModelSerializer):
@@ -40,6 +40,48 @@ class UserMemberSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'email']
+
+class PushSubscriptionSerializer(ModelSerializer):
+    user = HiddenField(default=CurrentUserDefault())
+    token = CharField(validators=[])
+
+    class Meta:
+        model = PushSubscription
+        fields = [
+            'id',
+            'user',
+            'token',
+            'platform',
+            'browser',
+            'device_label',
+            'is_ios',
+            'is_standalone',
+            'permission',
+            'is_active',
+            'last_seen_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'last_seen_at', 'created_at', 'updated_at']
+
+    def validate_permission(self, value):
+        valid_permissions = {
+            PushSubscription.PERMISSION_DEFAULT,
+            PushSubscription.PERMISSION_GRANTED,
+            PushSubscription.PERMISSION_DENIED,
+        }
+        if value not in valid_permissions:
+            raise ValidationError({'permission': 'Permissão inválida.'})
+        return value
+
+    def create(self, validated_data):
+        token = validated_data['token']
+        validated_data['is_active'] = True
+        subscription, _ = PushSubscription.objects.update_or_create(
+            token=token,
+            defaults=validated_data,
+        )
+        return subscription
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod

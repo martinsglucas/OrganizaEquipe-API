@@ -3,6 +3,12 @@ from firebase_admin import credentials, messaging
 import os
 import json
 
+INVALID_TOKEN_CODES = {
+    "unregistered",
+    "registration-token-not-registered",
+    "invalid-argument",
+}
+
 def _initialize_firebase():
     if firebase_admin._apps:
         return True
@@ -23,12 +29,25 @@ def _initialize_firebase():
         print(f"Erro ao inicializar Firebase Admin: {e}")
         return False
 
+def _extract_invalid_tokens(response, tokens):
+    invalid_tokens = []
+
+    for token, send_response in zip(tokens, response.responses):
+        if send_response.success:
+            continue
+
+        error_code = getattr(send_response.exception, "code", "") or ""
+        if error_code in INVALID_TOKEN_CODES:
+            invalid_tokens.append(token)
+
+    return invalid_tokens
+
 def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedule_date: str):
     if not fcm_tokens:
-        return
+        return []
 
     if not _initialize_firebase():
-        return
+        return []
 
     message = messaging.MulticastMessage(
         tokens=fcm_tokens,

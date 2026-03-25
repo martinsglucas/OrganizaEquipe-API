@@ -1,5 +1,5 @@
 from rest_framework.viewsets import ModelViewSet
-from escala.models import Schedule
+from escala.models import PushSubscription, Schedule
 from escala.serializers import CreateScheduleSerializer, RetrieveScheduleSerializer
 from django.utils import timezone
 from rest_framework.response import Response
@@ -52,13 +52,25 @@ class ScheduleViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         schedule = serializer.save()
 
-        tokens = [
-            p.user.fcm_token
-            for p in schedule.participations.all()
-            if p.user.fcm_token
-        ]
+        participant_user_ids = schedule.participations.values_list('user_id', flat=True)
+        tokens = list(
+            PushSubscription.objects.filter(
+                user_id__in=participant_user_ids,
+                is_active=True,
+                permission=PushSubscription.PERMISSION_GRANTED,
+            )
+            .values_list('token', flat=True)
+            .distinct()
+        )
 
-        send_schedule_notification(fcm_tokens=tokens, schedule_name=schedule.name, schedule_date=schedule.date)
+        invalid_tokens = send_schedule_notification(
+            fcm_tokens=tokens,
+            schedule_name=schedule.name,
+            schedule_date=schedule.date,
+        )
+
+        if invalid_tokens:
+            PushSubscription.objects.filter(token__in=invalid_tokens).update(is_active=False)
 
         output_serializer = RetrieveScheduleSerializer(
             schedule, context=self.get_serializer_context()
