@@ -42,26 +42,45 @@ def _extract_invalid_tokens(response, tokens):
 
     return invalid_tokens
 
-def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedule_date: str):
+def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedule_date, schedule_hour):
     if not fcm_tokens:
         return []
 
     if not _initialize_firebase():
         return []
 
+    formatted_date = schedule_date.strftime("%d/%m/%Y")
+    formatted_hour = schedule_hour.strftime("%H:%M")
+    
+    title = "📅 Você foi escalado!"
+    body = f"{schedule_name} • {formatted_date} às {formatted_hour}"
+
     message = messaging.MulticastMessage(
         tokens=fcm_tokens,
         data={
-            "title": "📅 Nova escala criada!",
-            "body": f"Você foi escalado para: {schedule_name} em {schedule_date}",
+            "title": title,
+            "body": body,
             "type": "new_schedule",
             "schedule_name": schedule_name,
             "schedule_date": str(schedule_date),
-        }
+            "schedule_hour": str(schedule_hour),
+        },
+        webpush=messaging.WebpushConfig(
+        notification=messaging.WebpushNotification(
+            title=title,
+            body=body,
+            icon="https://organizaequipe.onrender.com/favicon.ico",
+        ),
+        fcm_options=messaging.WebpushFCMOptions(
+            link="https://organizaequipe.onrender.com/escala",
+        ),
+    ),
     )
 
     try:
         response = messaging.send_each_for_multicast(message)
         print(f"Notificações enviadas: {response.success_count} sucesso(s), {response.failure_count} falha(s)")
+        return _extract_invalid_tokens(response, fcm_tokens)
     except Exception as e:
         print(f"Erro ao enviar notificações FCM: {e}")
+        return []

@@ -67,6 +67,7 @@ class ScheduleViewSet(ModelViewSet):
             fcm_tokens=tokens,
             schedule_name=schedule.name,
             schedule_date=schedule.date,
+            schedule_hour=schedule.hour,
         )
 
         if invalid_tokens:
