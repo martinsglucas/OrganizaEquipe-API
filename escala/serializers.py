@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
 from escala.models import User, PushSubscription, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
@@ -40,6 +41,7 @@ class UserMemberSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'email']
+
 
 class PushSubscriptionSerializer(ModelSerializer):
     user = HiddenField(default=CurrentUserDefault())
@@ -329,22 +331,49 @@ class UpdateScheduleParticipationSerializer(ModelSerializer):
 
 class CreateScheduleSerializer(ModelSerializer):
     participations = ScheduleParticipationSerializer(many=True)
-    
+
     class Meta:
         model = Schedule
         fields = '__all__'
-    
+
     def validate(self, data):
-        participations = data['participations']
+        team = data.get('team') or getattr(self.instance, 'team', None)
+        participations = data.get('participations')
+        request = self.context.get('request')
+
+        if not team:
+            return data
+
+        if request and request.user.is_authenticated and not team.admins.filter(id=request.user.id).exists():
+            raise ValidationError({'team': 'Apenas admins da equipe podem gerenciar escalas.'})
+
+        if participations is None:
+            return data
+
+        team_member_ids = set(team.members.values_list('id', flat=True))
+        team_admin_ids = set(team.admins.values_list('id', flat=True))
+        valid_user_ids = team_member_ids.union(team_admin_ids)
+        team_role_ids = set(team.roles.values_list('id', flat=True))
+        seen_user_ids = set()
+
         for participation in participations:
             user = participation['user']
-            unavailability = user.unavailability.filter(start_date__lte=data['date'])
-            # if unavailability.exists():
-                # raise ValidationError(f'O usuário {user} está indisponível nesta data.')
-            # if ParticipacaoEscala.objects.filter(escala=data['escala'], usuario=data['usuario']).exists():
-                # raise ValidationError('Este usuário já está participando desta escala.')
+            if user.id in seen_user_ids:
+                raise ValidationError({'participations': 'Um mesmo usuário não pode ser adicionado duas vezes à mesma escala.'})
+            seen_user_ids.add(user.id)
+
+            if user.id not in valid_user_ids:
+                raise ValidationError({'participations': f'O usuário {user.first_name} não faz parte da equipe {team.name}.'})
+
+            invalid_roles = [role.name for role in participation['roles'] if role.id not in team_role_ids]
+            if invalid_roles:
+                roles = ', '.join(invalid_roles)
+                raise ValidationError({'participations': f'As funções {roles} não pertencem à equipe {team.name}.'})
+
+            user.unavailability.filter(start_date=data['date'])
+
         return data
-    
+
     def add_participations(self, schedule, participations):
         for participation in participations:
             roles_data = participation.pop('roles')
@@ -354,29 +383,29 @@ class CreateScheduleSerializer(ModelSerializer):
             try:
                 user = User.objects.get(id=user_data)
             except User.DoesNotExist:
-                raise ValidationError(f"O usuario {user_data} não faz parte da equipe {schedule.team.name}.")
+                raise ValidationError(f"O usuário {user_data} não faz parte da equipe {schedule.team.name}.")
 
-            schedule_participation = ScheduleParticipation.objects.create(schedule=schedule, user=user, confirmation=confirmation)
+            schedule_participation = ScheduleParticipation.objects.create(
+                schedule=schedule,
+                user=user,
+                confirmation=confirmation,
+            )
             schedule_participation.roles.set(roles_data)
             schedule_participation.save()
-    
+
     def create(self, validated_data):
         participations = validated_data.pop('participations')
         schedule = Schedule.objects.create(**validated_data)
         self.add_participations(schedule, participations)
         return schedule
-    
+
     def update(self, instance, validated_data):
         participations_data = validated_data.pop('participations')
         instance = super().update(instance, validated_data)
         instance.participations.all().delete()
         self.add_participations(instance, participations_data)
         return instance
-    
-    # def to_representation(self, instance):
-    #     data = super().to_representation(instance)
-    #     data['participacoes'] = ParticipacaoEscalaRetrieveSerializer(instance.participacoes.all(), many=True).data
-    #     return data
+
 
 class RetrieveScheduleSerializer(ModelSerializer):
     participations = SerializerMethodField()
