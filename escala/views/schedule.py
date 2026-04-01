@@ -31,11 +31,7 @@ class ScheduleViewSet(ModelViewSet):
         queryset = super().get_queryset()
         user = self.request.user
         scope = self.request.query_params.get("scope")
-        legacy_user_only = self.request.query_params.get("userOnly")
         filter_value = self.request.query_params.get("filter", "all").lower()
-
-        if not scope and legacy_user_only is not None:
-            scope = "mine" if legacy_user_only.lower() == "true" else "all"
 
         scope = (scope or "all").lower()
         if scope not in {"all", "mine"}:
