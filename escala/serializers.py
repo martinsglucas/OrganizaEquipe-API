@@ -1,7 +1,7 @@
 from django.conf import settings
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
-from escala.models import User, PushSubscription, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, Request
+from escala.models import User, PushSubscription, Role, Team, TeamJoinRequest, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth import authenticate
 
 class UserSerializer(ModelSerializer):
@@ -317,6 +317,32 @@ class TeamSerializer(ModelSerializer):
         if members_data is not None:
             instance.members.set(members_data)
         return instance
+
+
+class TeamDiscoverySerializer(ModelSerializer):
+    class Meta:
+        model = Team
+        fields = ['id', 'name', 'organization']
+
+
+class TeamJoinRequestSerializer(ModelSerializer):
+    user = UserMemberSerializer(read_only=True)
+    team = TeamDiscoverySerializer(read_only=True)
+    reviewed_by = UserMemberSerializer(read_only=True)
+
+    class Meta:
+        model = TeamJoinRequest
+        fields = [
+            'id',
+            'user',
+            'team',
+            'status',
+            'reviewed_by',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
 
 class RetrieveTeamInvitationSerializer(ModelSerializer):
     team = RetrieveTeamSerializer()

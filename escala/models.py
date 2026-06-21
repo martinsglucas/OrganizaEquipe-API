@@ -188,6 +188,81 @@ class Team(models.Model):
     def __str__(self):
         return self.name
 
+
+class TeamJoinRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pendente'
+        APPROVED = 'approved', 'Aprovada'
+        REJECTED = 'rejected', 'Rejeitada'
+
+    user = models.ForeignKey(
+        'User',
+        on_delete=models.CASCADE,
+        related_name='team_join_requests',
+    )
+    team = models.ForeignKey(
+        'Team',
+        on_delete=models.CASCADE,
+        related_name='join_requests',
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        related_name='reviewed_team_join_requests',
+        blank=True,
+        null=True,
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'team'],
+                condition=models.Q(status='pending'),
+                name='unique_pending_team_join_request',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.user} solicita ingressar em {self.team}'
+
+    @transaction.atomic
+    def approve(self, reviewer):
+        join_request = type(self).objects.select_for_update().get(pk=self.pk)
+        if join_request.status == self.Status.APPROVED:
+            return
+        if join_request.status != self.Status.PENDING:
+            raise ValidationError('Somente solicitações pendentes podem ser aprovadas.')
+
+        join_request.team.members.add(join_request.user)
+        join_request.status = self.Status.APPROVED
+        join_request.reviewed_by = reviewer
+        join_request.reviewed_at = timezone.now()
+        join_request.save(
+            update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'],
+        )
+        self.status = join_request.status
+
+    @transaction.atomic
+    def reject(self, reviewer):
+        join_request = type(self).objects.select_for_update().get(pk=self.pk)
+        if join_request.status == self.Status.REJECTED:
+            return
+        if join_request.status != self.Status.PENDING:
+            raise ValidationError('Somente solicitações pendentes podem ser rejeitadas.')
+
+        join_request.status = self.Status.REJECTED
+        join_request.reviewed_by = reviewer
+        join_request.reviewed_at = timezone.now()
+        join_request.save(
+            update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'],
+        )
+        self.status = join_request.status
+
 class Role(models.Model):
     name = models.CharField(max_length=100)
     team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='roles')
