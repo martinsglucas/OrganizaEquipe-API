@@ -1,7 +1,7 @@
 from django.conf import settings
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
-from escala.models import User, PushSubscription, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, Request
+from escala.models import User, PushSubscription, Role, Team, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, Request
 from django.contrib.auth import authenticate
 
 class UserSerializer(ModelSerializer):
@@ -216,6 +216,44 @@ class OrganizationSerializer(ModelSerializer):
         if members_data is not None:
             instance.members.set(members_data)
         return instance
+
+
+class OrganizationCreationRequestSerializer(ModelSerializer):
+    requester = PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = OrganizationCreationRequest
+        fields = [
+            'id',
+            'requester',
+            'name',
+            'status',
+            'organization',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'status',
+            'organization',
+            'reviewed_at',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate_name(self, value):
+        name = value.strip()
+        if not name:
+            raise ValidationError('O nome da organização é obrigatório.')
+        requester = self.context['request'].user
+        if OrganizationCreationRequest.objects.filter(
+            requester=requester,
+            name__iexact=name,
+            status=OrganizationCreationRequest.Status.PENDING,
+        ).exists():
+            raise ValidationError('Já existe uma solicitação pendente para esta organização.')
+        return name
     
 class RetrieveOrganizationInvitationSerializer(ModelSerializer):
     organization = RetrieveOrganizationSerializer()

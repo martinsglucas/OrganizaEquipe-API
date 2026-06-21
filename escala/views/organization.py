@@ -1,11 +1,14 @@
 from rest_framework.viewsets import ModelViewSet
-from escala.models import Organization
+from escala.models import Organization, OrganizationCreationRequest
 from drf_spectacular.utils import extend_schema
-from escala.serializers import OrganizationSerializer, RetrieveOrganizationSerializer
+from escala.serializers import OrganizationCreationRequestSerializer, OrganizationSerializer, RetrieveOrganizationSerializer
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
+from rest_framework.viewsets import GenericViewSet
 
 class OrganizationViewSet(ModelViewSet):
     queryset = Organization.objects.all()
@@ -26,6 +29,11 @@ class OrganizationViewSet(ModelViewSet):
         elif self.action in ['retrieve', 'list']:
             return RetrieveOrganizationSerializer
         return super().get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_superuser:
+            raise PermissionDenied('A criação de organizações exige aprovação da plataforma.')
+        return super().create(request, *args, **kwargs)
     
     @extend_schema(
         request={
@@ -89,3 +97,21 @@ class OrganizationViewSet(ModelViewSet):
         return Response({"message": "Usuário removido com sucesso!"}, status=status.HTTP_200_OK)
 	# permission_classes = [AllowPostWithoutAuthentication]
 	# http_method_names = ['get', 'post', 'put', 'delete']
+
+
+class OrganizationCreationRequestViewSet(
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    GenericViewSet,
+):
+    serializer_class = OrganizationCreationRequestSerializer
+
+    def get_queryset(self):
+        queryset = OrganizationCreationRequest.objects.select_related('organization', 'requester')
+        if self.request.user.is_superuser:
+            return queryset
+        return queryset.filter(requester=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(requester=self.request.user)
