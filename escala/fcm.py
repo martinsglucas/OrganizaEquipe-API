@@ -1,5 +1,5 @@
 import firebase_admin
-from firebase_admin import credentials, messaging
+from firebase_admin import credentials, exceptions, messaging
 import os
 import json
 
@@ -36,8 +36,12 @@ def _extract_invalid_tokens(response, tokens):
         if send_response.success:
             continue
 
-        error_code = getattr(send_response.exception, "code", "") or ""
-        if error_code in INVALID_TOKEN_CODES:
+        exception = send_response.exception
+        error_code = (getattr(exception, "code", "") or "").lower()
+        if isinstance(
+            exception,
+            (messaging.UnregisteredError, exceptions.InvalidArgumentError),
+        ) or error_code in INVALID_TOKEN_CODES:
             invalid_tokens.append(token)
 
     return invalid_tokens

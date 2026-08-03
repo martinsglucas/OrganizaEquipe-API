@@ -1,11 +1,24 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.test import TestCase
+from firebase_admin import messaging
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from escala.admin import OrganizationCreationRequestAdmin
-from escala.models import Organization, OrganizationCreationRequest, Team, TeamJoinRequest, User
+from escala.models import (
+    Organization,
+    OrganizationCreationRequest,
+    PushSubscription,
+    Role,
+    Schedule,
+    Team,
+    TeamJoinRequest,
+    User,
+)
 
 
 USER_GROUP_PERMISSION_CODENAMES = {
@@ -57,6 +70,106 @@ class DefaultUsersGroupTests(TestCase):
             set(group.permissions.values_list("codename", flat=True)),
             USER_GROUP_PERMISSION_CODENAMES,
         )
+
+
+class ScheduleNotificationFailureTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="schedule-admin@example.com",
+            password="test-password",
+            first_name="Schedule Admin",
+        )
+        self.participant = User.objects.create_user(
+            email="participant@example.com",
+            password="test-password",
+            first_name="Participant",
+        )
+        organization = Organization.objects.create(name="Notification Organization")
+        organization.members.add(self.admin, self.participant)
+        self.team = Team.objects.create(name="Notification Team", organization=organization)
+        self.team.admins.add(self.admin)
+        self.team.members.add(self.admin, self.participant)
+        self.role = Role.objects.create(name="Member", team=self.team)
+        self.valid_subscription = PushSubscription.objects.create(
+            user=self.participant,
+            token="valid-token",
+            permission=PushSubscription.PERMISSION_GRANTED,
+        )
+        self.invalid_subscription = PushSubscription.objects.create(
+            user=self.participant,
+            token="invalid-token",
+            permission=PushSubscription.PERMISSION_GRANTED,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+
+    def schedule_payload(self):
+        return {
+            "name": "Sunday Schedule",
+            "team": self.team.id,
+            "date": "2026-08-09",
+            "hour": "19:00:00",
+            "participations": [
+                {
+                    "user": self.participant.id,
+                    "roles": [self.role.id],
+                    "confirmation": False,
+                },
+            ],
+        }
+
+    @patch("escala.fcm._initialize_firebase", return_value=True)
+    @patch("escala.fcm.messaging.send_each_for_multicast")
+    def test_schedule_creation_deactivates_only_invalid_token(
+        self,
+        send_each_for_multicast,
+        _initialize_firebase,
+    ):
+        def send_response(message):
+            responses = [
+                messaging.SendResponse(
+                    None,
+                    messaging.UnregisteredError("unregistered"),
+                )
+                if token == self.invalid_subscription.token
+                else messaging.SendResponse({"name": f"messages/{index}"}, None)
+                for index, token in enumerate(message.tokens, start=1)
+            ]
+            return SimpleNamespace(
+                success_count=sum(response.success for response in responses),
+                failure_count=sum(not response.success for response in responses),
+                responses=responses,
+            )
+
+        send_each_for_multicast.side_effect = send_response
+
+        response = self.client.post("/api/schedules/", self.schedule_payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Schedule.objects.count(), 1)
+        self.valid_subscription.refresh_from_db()
+        self.invalid_subscription.refresh_from_db()
+        self.assertTrue(self.valid_subscription.is_active)
+        self.assertFalse(self.invalid_subscription.is_active)
+
+    @patch("escala.fcm._initialize_firebase", return_value=True)
+    @patch(
+        "escala.fcm.messaging.send_each_for_multicast",
+        side_effect=RuntimeError("FCM unavailable"),
+    )
+    def test_schedule_creation_succeeds_when_multicast_send_fails(
+        self,
+        send_each_for_multicast,
+        _initialize_firebase,
+    ):
+        response = self.client.post("/api/schedules/", self.schedule_payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Schedule.objects.count(), 1)
+        self.valid_subscription.refresh_from_db()
+        self.invalid_subscription.refresh_from_db()
+        self.assertTrue(self.valid_subscription.is_active)
+        self.assertTrue(self.invalid_subscription.is_active)
 
 
 class OrganizationCreationRequestApiTests(TestCase):
