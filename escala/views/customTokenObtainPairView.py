@@ -9,6 +9,17 @@ from escala.serializers import CustomTokenObtainPairSerializer
 from django.conf import settings
 
 
+def _refresh_cookie_options():
+    is_secure = not settings.DEBUG
+    return {
+        "httponly": True,
+        "secure": is_secure,
+        "samesite": "None" if is_secure else "Lax",
+        "max_age": int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        "path": "/api/token/",
+    }
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     """
     Login: retorna o access token no body e seta o refresh token
@@ -32,11 +43,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         response.set_cookie(
             key="refreshToken",
             value=refresh_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="None",
-            max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
-            path="/api/token/",
+            **_refresh_cookie_options(),
         )
 
         return response
@@ -72,11 +79,7 @@ class CookieTokenRefreshView(APIView):
         response.set_cookie(
             key="refreshToken",
             value=str(new_refresh),
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="None",
-            max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
-            path="/api/token/",
+            **_refresh_cookie_options(),
         )
 
         return response
