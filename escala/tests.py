@@ -1,10 +1,62 @@
 from django.contrib import admin
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from escala.admin import OrganizationCreationRequestAdmin
 from escala.models import Organization, OrganizationCreationRequest, Team, TeamJoinRequest, User
+
+
+USER_GROUP_PERMISSION_CODENAMES = {
+    f"{action}_{model}"
+    for model in (
+        "organization",
+        "team",
+        "role",
+        "unavailability",
+        "schedule",
+        "scheduleparticipation",
+        "teaminvitation",
+        "organizationinvitation",
+        "request",
+        "user",
+    )
+    for action in ("add", "change", "delete", "view")
+}
+
+
+class DefaultUsersGroupTests(TestCase):
+    def test_test_database_bootstrap_creates_group_with_expected_permissions(self):
+        group = Group.objects.get(name="Users")
+
+        self.assertSetEqual(
+            set(group.permissions.values_list("codename", flat=True)),
+            USER_GROUP_PERMISSION_CODENAMES,
+        )
+
+    def test_new_user_is_added_to_default_group(self):
+        user = User.objects.create_user(
+            email="group-member@example.com",
+            password="test-password",
+            first_name="Group Member",
+        )
+
+        self.assertTrue(user.groups.filter(name="Users").exists())
+
+    def test_permission_synchronization_restores_group_idempotently(self):
+        from escala.signals import synchronize_default_users_group
+
+        Group.objects.filter(name="Users").delete()
+
+        synchronize_default_users_group(sender=None, using="default")
+        synchronize_default_users_group(sender=None, using="default")
+
+        group = Group.objects.get(name="Users")
+        self.assertSetEqual(
+            set(group.permissions.values_list("codename", flat=True)),
+            USER_GROUP_PERMISSION_CODENAMES,
+        )
 
 
 class OrganizationCreationRequestApiTests(TestCase):
