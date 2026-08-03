@@ -46,21 +46,75 @@ def _extract_invalid_tokens(response, tokens):
 
     return invalid_tokens
 
+
+def _send_multicast_notification(
+    fcm_tokens: list[str],
+    title: str,
+    body: str,
+    data: dict[str, str],
+):
+    if not fcm_tokens:
+        return {
+            "invalid_tokens": [],
+            "success_count": 0,
+            "failure_count": 0,
+        }
+
+    if not _initialize_firebase():
+        return {
+            "invalid_tokens": [],
+            "success_count": 0,
+            "failure_count": len(fcm_tokens),
+        }
+
+    try:
+        message = messaging.MulticastMessage(
+            tokens=fcm_tokens,
+            data=data,
+            webpush=messaging.WebpushConfig(
+                notification=messaging.WebpushNotification(
+                    title=title,
+                    body=body,
+                    icon="https://organizaequipe.onrender.com/favicon.ico",
+                ),
+                fcm_options=messaging.WebpushFCMOptions(
+                    link="https://organizaequipe.onrender.com/escala",
+                ),
+            ),
+        )
+        response = messaging.send_each_for_multicast(message)
+        print(
+            f"Notificações enviadas: {response.success_count} sucesso(s), "
+            f"{response.failure_count} falha(s)"
+        )
+        return {
+            "invalid_tokens": _extract_invalid_tokens(response, fcm_tokens),
+            "success_count": response.success_count,
+            "failure_count": response.failure_count,
+        }
+    except Exception as e:
+        print(f"Erro ao enviar notificações FCM: {e}")
+        return {
+            "invalid_tokens": [],
+            "success_count": 0,
+            "failure_count": len(fcm_tokens),
+        }
+
+
 def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedule_date, schedule_hour):
     if not fcm_tokens:
         return []
 
-    if not _initialize_firebase():
-        return []
-
     formatted_date = schedule_date.strftime("%d/%m/%Y")
     formatted_hour = schedule_hour.strftime("%H:%M")
-    
+
     title = "📅 Você foi escalado!"
     body = f"{schedule_name} • {formatted_date} às {formatted_hour}"
 
-    message = messaging.MulticastMessage(
-        tokens=fcm_tokens,
+    result = _send_multicast_notification(
+        fcm_tokens=fcm_tokens,
+        title=title,
+        body=body,
         data={
             "title": title,
             "body": body,
@@ -69,22 +123,36 @@ def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedu
             "schedule_date": str(schedule_date),
             "schedule_hour": str(schedule_hour),
         },
-        webpush=messaging.WebpushConfig(
-        notification=messaging.WebpushNotification(
-            title=title,
-            body=body,
-            icon="https://organizaequipe.onrender.com/favicon.ico",
-        ),
-        fcm_options=messaging.WebpushFCMOptions(
-            link="https://organizaequipe.onrender.com/escala",
-        ),
-    ),
     )
 
-    try:
-        response = messaging.send_each_for_multicast(message)
-        print(f"Notificações enviadas: {response.success_count} sucesso(s), {response.failure_count} falha(s)")
-        return _extract_invalid_tokens(response, fcm_tokens)
-    except Exception as e:
-        print(f"Erro ao enviar notificações FCM: {e}")
-        return []
+    return result["invalid_tokens"]
+
+
+def send_confirmation_reminder_notification(
+    fcm_tokens: list[str],
+    schedule_id: int,
+    schedule_name: str,
+    schedule_date,
+    schedule_hour,
+    window_hours: int,
+):
+    formatted_date = schedule_date.strftime("%d/%m/%Y")
+    formatted_hour = schedule_hour.strftime("%H:%M")
+    title = "⏰ Confirme sua participação"
+    body = f"{schedule_name} • {formatted_date} às {formatted_hour}"
+
+    return _send_multicast_notification(
+        fcm_tokens=fcm_tokens,
+        title=title,
+        body=body,
+        data={
+            "title": title,
+            "body": body,
+            "type": "schedule_confirmation_reminder",
+            "schedule_id": str(schedule_id),
+            "schedule_name": schedule_name,
+            "schedule_date": str(schedule_date),
+            "schedule_hour": str(schedule_hour),
+            "reminder_window_hours": str(window_hours),
+        },
+    )

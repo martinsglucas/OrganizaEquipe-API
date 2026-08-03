@@ -305,6 +305,33 @@ class ScheduleParticipation(models.Model):
     def __str__(self):
         return f'{self.schedule.name} - {self.user.first_name}'
 
+
+class ScheduleConfirmationReminder(models.Model):
+    WINDOW_CHOICES = (
+        (72, "72 hours"),
+        (48, "48 hours"),
+        (24, "24 hours"),
+    )
+
+    participation = models.ForeignKey(
+        ScheduleParticipation,
+        on_delete=models.CASCADE,
+        related_name="confirmation_reminders",
+    )
+    window_hours = models.PositiveSmallIntegerField(choices=WINDOW_CHOICES)
+    attempted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("participation", "window_hours"),
+                name="unique_confirmation_reminder_window",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.participation} - {self.window_hours}h"
+
 class TeamInvitation(models.Model):
     recipient_email = models.EmailField(max_length=100)
     team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='invitations')
