@@ -52,6 +52,7 @@ def _send_multicast_notification(
     title: str,
     body: str,
     data: dict[str, str],
+    link: str,
 ):
     if not fcm_tokens:
         return {
@@ -78,7 +79,7 @@ def _send_multicast_notification(
                     icon="https://organizaequipe.onrender.com/favicon.ico",
                 ),
                 fcm_options=messaging.WebpushFCMOptions(
-                    link="https://organizaequipe.onrender.com/escala",
+                    link=link,
                 ),
             ),
         )
@@ -123,6 +124,7 @@ def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedu
             "schedule_date": str(schedule_date),
             "schedule_hour": str(schedule_hour),
         },
+        link="https://organizaequipe.onrender.com/escala",
     )
 
     return result["invalid_tokens"]
@@ -155,4 +157,23 @@ def send_confirmation_reminder_notification(
             "schedule_hour": str(schedule_hour),
             "reminder_window_hours": str(window_hours),
         },
+        link="https://organizaequipe.onrender.com/escala",
+    )
+
+
+def send_unavailability_reminder_notification(fcm_tokens: list[str], month):
+    title = "📆 Registre suas indisponibilidades"
+    body = "Informe os dias em que você não estará disponível neste mês."
+
+    return _send_multicast_notification(
+        fcm_tokens=fcm_tokens,
+        title=title,
+        body=body,
+        data={
+            "title": title,
+            "body": body,
+            "type": "monthly_unavailability_reminder",
+            "month": str(month),
+        },
+        link="https://organizaequipe.onrender.com/indisponibilidade",
     )

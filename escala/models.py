@@ -332,6 +332,27 @@ class ScheduleConfirmationReminder(models.Model):
     def __str__(self):
         return f"{self.participation} - {self.window_hours}h"
 
+
+class MonthlyUnavailabilityReminder(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="monthly_unavailability_reminders",
+    )
+    month = models.DateField()
+    attempted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "month"),
+                name="unique_monthly_unavailability_reminder",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.month:%Y-%m}"
+
 class TeamInvitation(models.Model):
     recipient_email = models.EmailField(max_length=100)
     team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='invitations')
