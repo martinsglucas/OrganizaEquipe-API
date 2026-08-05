@@ -34,6 +34,14 @@ class OrganizationViewSet(ModelViewSet):
         if not request.user.is_superuser:
             raise PermissionDenied('A criação de organizações exige aprovação da plataforma.')
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self._require_organization_admin(self.get_object(), request.user)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._require_organization_admin(self.get_object(), request.user)
+        return super().destroy(request, *args, **kwargs)
     
     @extend_schema(
         request={
@@ -49,7 +57,8 @@ class OrganizationViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):
-        organization = get_object_or_404(Organization, pk=pk)
+        organization = self.get_object()
+        self._require_organization_admin(organization, request.user)
         user_id = request.data.get("user_id")
 
         if not user_id:
@@ -75,7 +84,8 @@ class OrganizationViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def remove_member(self, request, pk=None):
-        organization = get_object_or_404(Organization, pk=pk)
+        organization = self.get_object()
+        self._require_organization_admin(organization, request.user)
         user_id = request.data.get("user_id")
 
         if not user_id:
@@ -95,6 +105,13 @@ class OrganizationViewSet(ModelViewSet):
             team.save()
 
         return Response({"message": "Usuário removido com sucesso!"}, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _require_organization_admin(organization, user):
+        if not organization.admins.filter(id=user.id).exists():
+            raise PermissionDenied(
+                'Apenas admins da organização podem gerenciar seus membros.'
+            )
 	# permission_classes = [AllowPostWithoutAuthentication]
 	# http_method_names = ['get', 'post', 'put', 'delete']
 

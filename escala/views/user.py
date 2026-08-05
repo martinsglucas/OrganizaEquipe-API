@@ -3,8 +3,8 @@ from escala.models import User, TeamInvitation, OrganizationInvitation
 from escala.serializers import UserSerializer, RetrieveTeamInvitationSerializer, RetrieveOrganizationInvitationSerializer
 from escala.permissions import AllowPostWithoutAuthentication
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema
-from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
@@ -19,9 +19,15 @@ class UserViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['get'])
     def get_invitations(self, request, pk=None):
-        user = get_object_or_404(User, pk=pk)
-        team_invitations = TeamInvitation.objects.all().filter(recipient_email=user.email)
-        org_invitations = OrganizationInvitation.objects.all().filter(recipient_email=user.email)
+        if str(request.user.id) != str(pk):
+            raise PermissionDenied('Você só pode consultar seus próprios convites.')
+
+        team_invitations = TeamInvitation.objects.filter(
+            recipient_email__iexact=request.user.email,
+        )
+        org_invitations = OrganizationInvitation.objects.filter(
+            recipient_email__iexact=request.user.email,
+        )
 
         org_output = RetrieveOrganizationInvitationSerializer(org_invitations, many=True)
 

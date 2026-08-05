@@ -36,6 +36,14 @@ class TeamViewSet(ModelViewSet):
             return RetrieveTeamSerializer
         return super().get_serializer_class()
 
+    def update(self, request, *args, **kwargs):
+        self._require_team_admin(self.get_object(), request.user)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._require_team_admin(self.get_object(), request.user)
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def discoverable(self, request):
         teams = Team.objects.filter(
@@ -133,7 +141,8 @@ class TeamViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):
-        team = get_object_or_404(Team, pk=pk)
+        team = self.get_object()
+        self._require_team_admin(team, request.user)
         user_id = request.data.get("user_id")
 
         if not user_id:
@@ -159,7 +168,8 @@ class TeamViewSet(ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def remove_member(self, request, pk=None):
-        team = get_object_or_404(Team, pk=pk)
+        team = self.get_object()
+        self._require_team_admin(team, request.user)
         user_id = request.data.get("user_id")
 
         if not user_id:
