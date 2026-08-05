@@ -1,7 +1,20 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from .models import User, Role, Team, Unavailability, Schedule, ScheduleParticipation, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, Request
+from .models import (
+    Organization,
+    OrganizationCreationRequest,
+    OrganizationInvitation,
+    PushSubscription,
+    Request,
+    Role,
+    Schedule,
+    ScheduleParticipation,
+    Team,
+    TeamInvitation,
+    Unavailability,
+    User,
+)
 from django.contrib.auth.models import Group, Permission
 
 
@@ -45,6 +58,65 @@ admin.site.register(Organization)
 admin.site.register(TeamInvitation)
 admin.site.register(OrganizationInvitation)
 admin.site.register(Request)
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = (
+        'user',
+        'device_label',
+        'platform',
+        'browser',
+        'permission',
+        'is_active',
+        'last_seen_at',
+    )
+    list_filter = (
+        'platform',
+        'browser',
+        'permission',
+        'is_active',
+        'is_ios',
+        'is_standalone',
+    )
+    search_fields = (
+        'user__email',
+        'user__first_name',
+        'user__last_name',
+        'device_label',
+        'token',
+    )
+    readonly_fields = (
+        'user',
+        'token',
+        'platform',
+        'browser',
+        'device_label',
+        'is_ios',
+        'is_standalone',
+        'permission',
+        'is_active',
+        'last_seen_at',
+        'created_at',
+        'updated_at',
+    )
+    list_select_related = ('user',)
+    ordering = ('-last_seen_at',)
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OrganizationCreationRequest)

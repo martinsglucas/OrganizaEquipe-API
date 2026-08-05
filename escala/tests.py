@@ -4,11 +4,12 @@ from unittest.mock import patch
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.test import TestCase
+from django.urls import reverse
 from firebase_admin import messaging
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from escala.admin import OrganizationCreationRequestAdmin
+from escala.admin import OrganizationCreationRequestAdmin, PushSubscriptionAdmin
 from escala.models import (
     Organization,
     OrganizationCreationRequest,
@@ -308,6 +309,77 @@ class OrganizationCreationRequestAdminTests(TestCase):
         self.assertFalse(self.model_admin.has_change_permission(regular_request))
         self.assertTrue(self.model_admin.has_module_permission(superuser_request))
         self.assertTrue(self.model_admin.has_change_permission(superuser_request))
+
+
+class PushSubscriptionAdminTests(TestCase):
+    def setUp(self):
+        self.regular_staff = User.objects.create_user(
+            email="staff@example.com",
+            password="test-password",
+            first_name="Staff",
+            is_staff=True,
+        )
+        self.superuser = User.objects.create_superuser(
+            email="admin@example.com",
+            password="test-password",
+            first_name="Admin",
+        )
+        self.subscription = PushSubscription.objects.create(
+            user=self.regular_staff,
+            token="admin-visible-push-token",
+            platform="web",
+            browser="Chrome",
+            device_label="Staff browser",
+            permission=PushSubscription.PERMISSION_GRANTED,
+        )
+        self.model_admin = PushSubscriptionAdmin(PushSubscription, admin.site)
+
+    def test_only_superuser_can_view_push_subscriptions(self):
+        regular_request = type("Request", (), {"user": self.regular_staff})()
+        superuser_request = type("Request", (), {"user": self.superuser})()
+
+        self.assertFalse(self.model_admin.has_module_permission(regular_request))
+        self.assertFalse(self.model_admin.has_view_permission(regular_request))
+        self.assertTrue(self.model_admin.has_module_permission(superuser_request))
+        self.assertTrue(self.model_admin.has_view_permission(superuser_request))
+
+    def test_push_subscriptions_are_read_only(self):
+        request = type("Request", (), {"user": self.superuser})()
+
+        self.assertFalse(self.model_admin.has_add_permission(request))
+        self.assertFalse(self.model_admin.has_change_permission(request))
+        self.assertFalse(self.model_admin.has_delete_permission(request))
+        self.assertIn("token", self.model_admin.get_readonly_fields(request))
+
+    def test_regular_staff_cannot_open_push_subscription_admin_pages(self):
+        self.client.force_login(self.regular_staff)
+
+        list_response = self.client.get(
+            reverse("admin:escala_pushsubscription_changelist")
+        )
+        detail_response = self.client.get(
+            reverse(
+                "admin:escala_pushsubscription_change",
+                args=[self.subscription.id],
+            )
+        )
+
+        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(detail_response.status_code, 403)
+
+    def test_superuser_can_view_the_complete_token_in_read_only_detail(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse(
+                "admin:escala_pushsubscription_change",
+                args=[self.subscription.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.subscription.token)
+        self.assertNotContains(response, 'name="token"')
 
 
 class TeamJoinRequestApiTests(TestCase):
