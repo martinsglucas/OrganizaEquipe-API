@@ -102,7 +102,13 @@ def _send_multicast_notification(
         }
 
 
-def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedule_date, schedule_hour):
+def send_schedule_notification(
+    fcm_tokens: list[str],
+    schedule_id: int,
+    schedule_name: str,
+    schedule_date,
+    schedule_hour,
+):
     if not fcm_tokens:
         return []
 
@@ -120,6 +126,85 @@ def send_schedule_notification(fcm_tokens: list[str], schedule_name: str, schedu
             "title": title,
             "body": body,
             "type": "new_schedule",
+            "schedule_id": str(schedule_id),
+            "schedule_name": schedule_name,
+            "schedule_date": str(schedule_date),
+            "schedule_hour": str(schedule_hour),
+        },
+        link=f"https://organizaequipe.onrender.com/escala/{schedule_id}",
+    )
+
+    return result["invalid_tokens"]
+
+
+def send_schedule_updated_notification(
+    fcm_tokens: list[str],
+    schedule_id: int,
+    schedule_name: str,
+    schedule_date,
+    schedule_hour,
+    participant_removed: bool,
+):
+    if not fcm_tokens:
+        return []
+
+    formatted_date = schedule_date.strftime("%d/%m/%Y")
+    formatted_hour = schedule_hour.strftime("%H:%M")
+
+    if participant_removed:
+        title = "📅 Sua escala foi alterada"
+        body = (
+            f"Você não está mais escalado para {schedule_name} • "
+            f"{formatted_date} às {formatted_hour}"
+        )
+    else:
+        title = "📅 Escala atualizada"
+        body = f"{schedule_name} • {formatted_date} às {formatted_hour}"
+
+    result = _send_multicast_notification(
+        fcm_tokens=fcm_tokens,
+        title=title,
+        body=body,
+        data={
+            "title": title,
+            "body": body,
+            "type": "updated_schedule",
+            "schedule_id": str(schedule_id),
+            "schedule_name": schedule_name,
+            "schedule_date": str(schedule_date),
+            "schedule_hour": str(schedule_hour),
+            "participant_removed": str(participant_removed).lower(),
+        },
+        link=f"https://organizaequipe.onrender.com/escala/{schedule_id}",
+    )
+
+    return result["invalid_tokens"]
+
+
+def send_schedule_deleted_notification(
+    fcm_tokens: list[str],
+    schedule_id: int,
+    schedule_name: str,
+    schedule_date,
+    schedule_hour,
+):
+    if not fcm_tokens:
+        return []
+
+    formatted_date = schedule_date.strftime("%d/%m/%Y")
+    formatted_hour = schedule_hour.strftime("%H:%M")
+    title = "🗑️ Escala cancelada"
+    body = f"{schedule_name} • {formatted_date} às {formatted_hour}"
+
+    result = _send_multicast_notification(
+        fcm_tokens=fcm_tokens,
+        title=title,
+        body=body,
+        data={
+            "title": title,
+            "body": body,
+            "type": "deleted_schedule",
+            "schedule_id": str(schedule_id),
             "schedule_name": schedule_name,
             "schedule_date": str(schedule_date),
             "schedule_hour": str(schedule_hour),

@@ -12,7 +12,28 @@ from escala.models import PushSubscription, Schedule
 from escala.permissions import IsScheduleAccessible
 from escala.serializers import CreateScheduleSerializer, RetrieveScheduleSerializer
 
-from ..fcm import send_schedule_notification
+from ..fcm import (
+    send_schedule_deleted_notification,
+    send_schedule_notification,
+    send_schedule_updated_notification,
+)
+
+
+def _get_active_subscription_tokens(user_ids):
+    return list(
+        PushSubscription.objects.filter(
+            user_id__in=user_ids,
+            is_active=True,
+            permission=PushSubscription.PERMISSION_GRANTED,
+        )
+        .values_list("token", flat=True)
+        .distinct()
+    )
+
+
+def _deactivate_invalid_tokens(tokens):
+    if tokens:
+        PushSubscription.objects.filter(token__in=tokens).update(is_active=False)
 
 
 class SchedulePagination(PageNumberPagination):
@@ -74,28 +95,97 @@ class ScheduleViewSet(ModelViewSet):
         schedule = serializer.save()
 
         participant_user_ids = schedule.participations.values_list("user_id", flat=True)
-        tokens = list(
-            PushSubscription.objects.filter(
-                user_id__in=participant_user_ids,
-                is_active=True,
-                permission=PushSubscription.PERMISSION_GRANTED,
-            )
-            .values_list("token", flat=True)
-            .distinct()
-        )
+        tokens = _get_active_subscription_tokens(participant_user_ids)
 
         invalid_tokens = send_schedule_notification(
             fcm_tokens=tokens,
+            schedule_id=schedule.id,
             schedule_name=schedule.name,
             schedule_date=schedule.date,
             schedule_hour=schedule.hour,
         )
 
-        if invalid_tokens:
-            PushSubscription.objects.filter(token__in=invalid_tokens).update(is_active=False)
+        _deactivate_invalid_tokens(invalid_tokens)
 
         output_serializer = RetrieveScheduleSerializer(
             schedule, context=self.get_serializer_context()
         )
         headers = self.get_success_headers(output_serializer.data)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        schedule = self.get_object()
+        previous_user_ids = set(
+            schedule.participations.values_list("user_id", flat=True)
+        )
+        serializer = self.get_serializer(
+            schedule,
+            data=request.data,
+            partial=partial,
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        current_user_ids = set(
+            schedule.participations.values_list("user_id", flat=True)
+        )
+        removed_user_ids = previous_user_ids - current_user_ids
+        invalid_tokens = []
+
+        current_tokens = _get_active_subscription_tokens(current_user_ids)
+        if current_tokens:
+            invalid_tokens.extend(
+                send_schedule_updated_notification(
+                    fcm_tokens=current_tokens,
+                    schedule_id=schedule.id,
+                    schedule_name=schedule.name,
+                    schedule_date=schedule.date,
+                    schedule_hour=schedule.hour,
+                    participant_removed=False,
+                )
+            )
+
+        removed_tokens = _get_active_subscription_tokens(removed_user_ids)
+        if removed_tokens:
+            invalid_tokens.extend(
+                send_schedule_updated_notification(
+                    fcm_tokens=removed_tokens,
+                    schedule_id=schedule.id,
+                    schedule_name=schedule.name,
+                    schedule_date=schedule.date,
+                    schedule_hour=schedule.hour,
+                    participant_removed=True,
+                )
+            )
+
+        _deactivate_invalid_tokens(invalid_tokens)
+
+        if getattr(schedule, "_prefetched_objects_cache", None):
+            schedule._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        schedule = self.get_object()
+        participant_user_ids = list(
+            schedule.participations.values_list("user_id", flat=True)
+        )
+        tokens = _get_active_subscription_tokens(participant_user_ids)
+        notification_data = {
+            "schedule_id": schedule.id,
+            "schedule_name": schedule.name,
+            "schedule_date": schedule.date,
+            "schedule_hour": schedule.hour,
+        }
+
+        self.perform_destroy(schedule)
+
+        if tokens:
+            invalid_tokens = send_schedule_deleted_notification(
+                fcm_tokens=tokens,
+                **notification_data,
+            )
+            _deactivate_invalid_tokens(invalid_tokens)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
