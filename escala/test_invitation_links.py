@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from escala.models import InvitationLink, Organization, Team, User
+from escala.models import InvitationLink, Organization, Request, Team, User
 
 
 class InvitationLinkLifecycleTests(TestCase):
@@ -210,3 +210,93 @@ class InvitationLinkLifecycleTests(TestCase):
 
         self.assertEqual(invalid_type.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(missing_target.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_authenticated_user_accepts_organization_link_without_side_effects(self):
+        self.authenticate(self.organization_admin)
+        link = self.create_link().data
+        self.authenticate(self.outsider)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(self.organization.members.filter(pk=self.outsider.pk).exists())
+        self.assertFalse(self.organization.admins.filter(pk=self.outsider.pk).exists())
+        self.assertEqual(Request.objects.count(), 0)
+        self.assertTrue(InvitationLink.objects.get(pk=link["id"]).is_active)
+
+    def test_repeated_organization_link_acceptance_is_idempotent(self):
+        self.authenticate(self.organization_admin)
+        token = self.create_link().data["token"]
+        self.organization.members.add(self.outsider)
+        self.authenticate(self.outsider)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": token},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self.organization.members.filter(pk=self.outsider.pk).count(),
+            1,
+        )
+        self.assertEqual(Request.objects.count(), 0)
+
+    def test_invalid_or_ineligible_tokens_are_rejected_without_leaking_reason(self):
+        self.authenticate(self.organization_admin)
+        revoked_link = self.create_link().data
+        InvitationLink.objects.filter(pk=revoked_link["id"]).update(
+            revoked_at=timezone.now()
+        )
+
+        expired_organization = Organization.objects.create(name="Expired Organization")
+        expired_organization.admins.add(self.organization_admin)
+        expired_link = InvitationLink.objects.create(
+            organization=expired_organization,
+            created_by=self.organization_admin,
+            expires_at=timezone.now() - timedelta(seconds=1),
+        )
+
+        self.authenticate(self.team_admin)
+        team_link = self.create_link("team").data
+        self.authenticate(self.outsider)
+
+        for token in [
+            revoked_link["token"],
+            expired_link.token,
+            team_link["token"],
+            "unknown-token",
+        ]:
+            with self.subTest(token=token):
+                response = self.client.post(
+                    "/api/invitation_links/accept/",
+                    {"token": token},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.assertFalse(self.organization.members.filter(pk=self.outsider.pk).exists())
+        self.assertFalse(
+            expired_organization.members.filter(pk=self.outsider.pk).exists()
+        )
+        self.assertFalse(self.team.members.filter(pk=self.outsider.pk).exists())
+
+    def test_anonymous_user_cannot_accept_organization_link(self):
+        self.authenticate(self.organization_admin)
+        token = self.create_link().data["token"]
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": token},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(self.organization.members.filter(pk=self.outsider.pk).exists())

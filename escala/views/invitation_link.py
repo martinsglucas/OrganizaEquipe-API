@@ -118,6 +118,19 @@ class InvitationLinkViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(PublicInvitationLinkSerializer(link).data)
 
+    @action(detail=False, methods=['post'])
+    def accept(self, request):
+        with transaction.atomic():
+            link = InvitationLink.objects.select_for_update().filter(
+                token=request.data.get('token'),
+                organization__isnull=False,
+                revoked_at__isnull=True,
+            ).first()
+            if link is None or not link.is_active:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            link.organization.members.add(request.user)
+        return Response(PublicInvitationLinkSerializer(link).data)
+
     @staticmethod
     def _get_target(target_type, target_id):
         model = Organization if target_type == 'organization' else Team
