@@ -363,6 +363,7 @@ class Schedule(models.Model):
     team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='schedules')
     date = models.DateField()
     hour = models.TimeField()
+    notes = models.TextField(blank=True, default='')
 
     def __str__(self):
         return f'{self.name} - {self.team.name} ({self.date})'
