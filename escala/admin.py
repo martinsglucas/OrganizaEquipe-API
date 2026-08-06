@@ -5,6 +5,7 @@ from .models import (
     Organization,
     OrganizationCreationRequest,
     OrganizationInvitation,
+    InvitationLink,
     PushSubscription,
     Request,
     Role,
@@ -58,6 +59,13 @@ admin.site.register(Organization)
 admin.site.register(TeamInvitation)
 admin.site.register(OrganizationInvitation)
 admin.site.register(Request)
+
+
+@admin.register(InvitationLink)
+class InvitationLinkAdmin(admin.ModelAdmin):
+    list_display = ('target_type', 'target', 'status', 'expires_at', 'updated_at')
+    readonly_fields = ('token', 'created_by', 'created_at', 'updated_at')
+    search_fields = ('organization__name', 'team__name', 'token')
 
 
 @admin.register(PushSubscription)

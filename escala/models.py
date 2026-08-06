@@ -1,4 +1,6 @@
 import uuid
+import secrets
+import string
 from django.db import models
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -187,6 +189,79 @@ class Team(models.Model):
 
     def __str__(self):
         return self.name
+
+
+def generate_invitation_link_token():
+    return ''.join(secrets.choice(string.ascii_letters) for _ in range(48))
+
+
+class InvitationLink(models.Model):
+    organization = models.OneToOneField(
+        'Organization',
+        on_delete=models.CASCADE,
+        related_name='invitation_link',
+        blank=True,
+        null=True,
+    )
+    team = models.OneToOneField(
+        'Team',
+        on_delete=models.CASCADE,
+        related_name='invitation_link',
+        blank=True,
+        null=True,
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        default=generate_invitation_link_token,
+    )
+    created_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        related_name='created_invitation_links',
+        blank=True,
+        null=True,
+    )
+    expires_at = models.DateTimeField(blank=True, null=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(organization__isnull=False, team__isnull=True)
+                    | models.Q(organization__isnull=True, team__isnull=False)
+                ),
+                name='invitation_link_has_one_target',
+            ),
+        ]
+
+    @property
+    def target(self):
+        return self.organization or self.team
+
+    @property
+    def target_type(self):
+        return 'organization' if self.organization_id else 'team'
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and (
+            self.expires_at is None or self.expires_at > timezone.now()
+        )
+
+    @property
+    def status(self):
+        if self.revoked_at is not None:
+            return 'revoked'
+        if self.expires_at is not None and self.expires_at <= timezone.now():
+            return 'expired'
+        return 'active'
+
+    def __str__(self):
+        return f'{self.target_type}: {self.target}'
 
 
 class TeamJoinRequest(models.Model):

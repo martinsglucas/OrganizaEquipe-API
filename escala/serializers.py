@@ -1,7 +1,7 @@
 from django.conf import settings
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField
-from escala.models import User, PushSubscription, Role, Team, TeamJoinRequest, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, Request
+from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField, Serializer, ChoiceField, IntegerField, DateTimeField
+from escala.models import User, PushSubscription, Role, Team, TeamJoinRequest, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, InvitationLink, Request
 from django.contrib.auth import authenticate
 
 class UserSerializer(ModelSerializer):
@@ -175,6 +175,56 @@ class TeamInvitationSerializer(ModelSerializer):
 
         data["recipient_email"] = user.email
         return data
+
+
+class InvitationLinkInputSerializer(Serializer):
+    target_type = ChoiceField(choices=('organization', 'team'))
+    target_id = IntegerField(min_value=1)
+    expires_at = DateTimeField(required=False, allow_null=True)
+
+
+class InvitationLinkExpirationSerializer(Serializer):
+    expires_at = DateTimeField(required=False, allow_null=True)
+
+
+class InvitationLinkSerializer(ModelSerializer):
+    target_type = SerializerMethodField()
+    target_id = SerializerMethodField()
+    target_name = SerializerMethodField()
+    status = SerializerMethodField()
+
+    class Meta:
+        model = InvitationLink
+        fields = (
+            'id',
+            'token',
+            'target_type',
+            'target_id',
+            'target_name',
+            'status',
+            'expires_at',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = fields
+
+    def get_target_type(self, obj):
+        return obj.target_type
+
+    def get_target_id(self, obj):
+        return obj.target.id
+
+    def get_target_name(self, obj):
+        return obj.target.name
+
+    def get_status(self, obj):
+        return obj.status
+
+
+class PublicInvitationLinkSerializer(InvitationLinkSerializer):
+    class Meta:
+        model = InvitationLink
+        fields = ('target_type', 'target_id', 'target_name', 'status')
 
 class CreateRequestSerializer(ModelSerializer):
     class Meta:
