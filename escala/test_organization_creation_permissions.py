@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.apps import apps
 from django.contrib.auth.models import Group, Permission
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -6,7 +7,7 @@ from django.test import TestCase, TransactionTestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from escala.models import Organization, OrganizationCreationRequest, User
+from escala.models import Organization, User
 
 
 CREATOR_GROUP_NAME = 'Organization Creators'
@@ -55,6 +56,46 @@ class OrganizationCreatorGroupMigrationTests(TransactionTestCase):
         self.assertEqual(
             list(creator_group.permissions.values_list('codename', flat=True)),
             ['add_organization'],
+        )
+
+
+class OrganizationCreationRequestRemovalMigrationTests(TransactionTestCase):
+    migrate_from = [('escala', '0012_sync_organization_creator_group')]
+    migrate_to = [('escala', '0013_delete_organizationcreationrequest')]
+
+    def setUp(self):
+        super().setUp()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        user_model = old_apps.get_model('escala', 'User')
+        request_model = old_apps.get_model(
+            'escala',
+            'OrganizationCreationRequest',
+        )
+        requester = user_model.objects.create(email='legacy@example.com')
+        request_model.objects.create(
+            requester=requester,
+            name='Discarded Legacy Request',
+        )
+        self.assertEqual(request_model.objects.count(), 1)
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        self.apps = executor.loader.project_state(self.migrate_to).apps
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate(
+            MigrationExecutor(connection).loader.graph.leaf_nodes()
+        )
+        super().tearDown()
+
+    def test_migration_removes_model_table_and_existing_records(self):
+        with self.assertRaises(LookupError):
+            self.apps.get_model('escala', 'OrganizationCreationRequest')
+        self.assertNotIn(
+            'escala_organizationcreationrequest',
+            connection.introspection.table_names(),
         )
 
 
@@ -170,7 +211,7 @@ class OrganizationCreationPermissionApiTests(TestCase):
         self.assertFalse(ordinary_response.data['can_create_organization'])
         self.assertTrue(login_response.data['user']['can_create_organization'])
 
-    def test_legacy_request_route_is_removed_and_model_is_not_registered(self):
+    def test_legacy_request_route_and_model_are_removed(self):
         self.client.force_authenticate(self.ordinary)
 
         list_response = self.client.get('/api/organization_requests/')
@@ -182,12 +223,9 @@ class OrganizationCreationPermissionApiTests(TestCase):
 
         self.assertEqual(list_response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(create_response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertFalse(admin.site.is_registered(OrganizationCreationRequest))
-
-        legacy_record = OrganizationCreationRequest.objects.create(
-            requester=self.ordinary,
-            name='Preserved Legacy Record',
-        )
-        self.assertTrue(
-            OrganizationCreationRequest.objects.filter(pk=legacy_record.pk).exists()
+        with self.assertRaises(LookupError):
+            apps.get_model('escala', 'OrganizationCreationRequest')
+        self.assertNotIn(
+            'organizationcreationrequest',
+            {model._meta.model_name for model in admin.site._registry},
         )
