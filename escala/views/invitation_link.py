@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -60,6 +60,7 @@ class InvitationLinkViewSet(GenericViewSet):
         target_id = input_serializer.validated_data['target_id']
         target = self._get_target(target_type, target_id)
         self._require_target_admin(target, target_type, request.user)
+        self._require_team_link_eligible(target, target_type)
 
         lookup = {target_type: target}
         link = InvitationLink.objects.select_for_update().filter(**lookup).first()
@@ -99,6 +100,7 @@ class InvitationLinkViewSet(GenericViewSet):
             link = self._get_managed_link(pk, request.user)
             if link is None:
                 return Response(status=status.HTTP_404_NOT_FOUND)
+            self._require_team_link_eligible(link.target, link.target_type)
             link.token = generate_invitation_link_token()
             link.created_by = request.user
             link.expires_at = expires_serializer.validated_data.get('expires_at')
@@ -114,7 +116,7 @@ class InvitationLinkViewSet(GenericViewSet):
             token=token,
             revoked_at__isnull=True,
         )
-        if not link.is_active:
+        if not link.is_active or self._is_closed_team_link(link):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(PublicInvitationLinkSerializer(link).data)
 
@@ -123,10 +125,14 @@ class InvitationLinkViewSet(GenericViewSet):
         with transaction.atomic():
             link = InvitationLink.objects.select_for_update().filter(
                 token=request.data.get('token'),
-                organization__isnull=False,
                 revoked_at__isnull=True,
             ).first()
-            if link is None or not link.is_active:
+            if (
+                link is None
+                or not link.is_active
+                or self._is_closed_team_link(link)
+                or link.organization_id is None
+            ):
                 return Response(status=status.HTTP_404_NOT_FOUND)
             link.organization.members.add(request.user)
         return Response(PublicInvitationLinkSerializer(link).data)
@@ -143,6 +149,18 @@ class InvitationLinkViewSet(GenericViewSet):
             raise PermissionDenied(
                 f'Apenas admins da {target_label} podem gerenciar links de convite.'
             )
+
+    @staticmethod
+    def _require_team_link_eligible(target, target_type):
+        if target_type == 'team' and target.visibility == Team.Visibility.CLOSED:
+            raise ValidationError('Equipes fechadas não aceitam links de convite.')
+
+    @staticmethod
+    def _is_closed_team_link(link):
+        return (
+            link.team_id is not None
+            and link.team.visibility == Team.Visibility.CLOSED
+        )
 
     @staticmethod
     def _get_managed_link(pk, user):

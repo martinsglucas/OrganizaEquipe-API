@@ -321,7 +321,7 @@ class CreateTeamSerializer(ModelSerializer):
     
     class Meta:
         model = Team
-        fields = ['id', 'name', 'code_access', 'organization', 'admins']
+        fields = ['id', 'name', 'code_access', 'organization', 'admins', 'visibility']
     
     def create(self, validated_data):
         user = self.context['request'].user
@@ -337,7 +337,7 @@ class RetrieveTeamSerializer(ModelSerializer):
     
     class Meta:
         model = Team
-        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members', 'organization']
+        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members', 'organization', 'visibility']
     
     def get_admins(self, obj):
         return UserMemberSerializer(obj.admins.order_by("first_name"), many=True).data
@@ -355,7 +355,7 @@ class TeamSerializer(ModelSerializer):
 
     class Meta:
         model = Team
-        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members']
+        fields = ['id', 'name', 'code_access', 'admins', 'roles', 'members', 'visibility']
     
     def update(self, instance, validated_data):
         admins_data = validated_data.pop('admins', None)
@@ -374,7 +374,7 @@ class TeamSerializer(ModelSerializer):
 class TeamDiscoverySerializer(ModelSerializer):
     class Meta:
         model = Team
-        fields = ['id', 'name', 'organization']
+        fields = ['id', 'name', 'organization', 'visibility']
 
 
 class TeamJoinRequestSerializer(ModelSerializer):

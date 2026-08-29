@@ -181,11 +181,21 @@ class OrganizationCreationRequest(models.Model):
         self.status = creation_request.status
 
 class Team(models.Model):
+    class Visibility(models.TextChoices):
+        DISCOVERABLE = 'discoverable', 'Descoberta'
+        PRIVATE = 'private', 'Privada'
+        CLOSED = 'closed', 'Fechada'
+
     name = models.CharField(max_length=100)
     admins = models.ManyToManyField('User', related_name='administered_teams')
     code_access = models.CharField(max_length=6, default=generate_unique_access_code, unique=True)
     organization = models.ForeignKey('Organization', on_delete=models.CASCADE, related_name='teams')
     members = models.ManyToManyField('User', related_name='teams')
+    visibility = models.CharField(
+        max_length=12,
+        choices=Visibility.choices,
+        default=Visibility.DISCOVERABLE,
+    )
 
     def __str__(self):
         return self.name

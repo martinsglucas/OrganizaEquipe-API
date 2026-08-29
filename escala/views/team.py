@@ -23,6 +23,7 @@ class TeamViewSet(ModelViewSet):
             queryset = queryset.filter(
                 code_access=code_access,
                 organization__members=self.request.user,
+                visibility=Team.Visibility.DISCOVERABLE,
             )
         
         return queryset
@@ -48,6 +49,7 @@ class TeamViewSet(ModelViewSet):
     def discoverable(self, request):
         teams = Team.objects.filter(
             organization__members=request.user,
+            visibility=Team.Visibility.DISCOVERABLE,
         ).exclude(
             members=request.user,
         ).exclude(
@@ -72,6 +74,8 @@ class TeamViewSet(ModelViewSet):
         team = self.get_object()
         if not team.organization.members.filter(id=request.user.id).exists():
             raise PermissionDenied('Você só pode solicitar equipes da sua organização.')
+        if team.visibility != Team.Visibility.DISCOVERABLE:
+            raise ValidationError('Esta equipe não aceita solicitações de ingresso.')
         if team.members.filter(id=request.user.id).exists():
             raise ValidationError('Você já faz parte desta equipe.')
         if TeamJoinRequest.objects.filter(
