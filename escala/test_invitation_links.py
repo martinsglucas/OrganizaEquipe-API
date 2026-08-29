@@ -1,11 +1,19 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from escala.models import InvitationLink, Organization, Request, Team, User
+from escala.models import (
+    InvitationLink,
+    Organization,
+    Request,
+    Team,
+    TeamJoinRequest,
+    User,
+)
 
 
 class InvitationLinkLifecycleTests(TestCase):
@@ -247,7 +255,135 @@ class InvitationLinkLifecycleTests(TestCase):
         )
         self.assertEqual(Request.objects.count(), 0)
 
-    def test_invalid_or_ineligible_tokens_are_rejected_without_leaking_reason(self):
+    def test_parent_organization_member_accepts_discoverable_team_link(self):
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.organization_admin)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["target_type"], "team")
+        self.assertTrue(
+            self.team.members.filter(pk=self.organization_admin.pk).exists()
+        )
+        self.assertTrue(InvitationLink.objects.get(pk=link["id"]).is_active)
+        self.assertEqual(TeamJoinRequest.objects.count(), 0)
+
+    def test_parent_organization_member_accepts_private_team_link(self):
+        self.team.visibility = Team.Visibility.PRIVATE
+        self.team.save(update_fields=["visibility"])
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.organization_admin)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            self.team.members.filter(pk=self.organization_admin.pk).exists()
+        )
+
+    def test_user_outside_parent_organization_cannot_accept_team_link(self):
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.outsider)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "Você precisa fazer parte da organização desta equipe para aceitar o convite.",
+        )
+        self.assertFalse(self.team.members.filter(pk=self.outsider.pk).exists())
+
+    def test_repeated_team_link_acceptance_is_idempotent_and_keeps_link_active(self):
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.organization_admin)
+
+        first = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+        repeated = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(repeated.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self.team.members.filter(pk=self.organization_admin.pk).count(),
+            1,
+        )
+        self.assertTrue(InvitationLink.objects.get(pk=link["id"]).is_active)
+
+    def test_team_link_acceptance_approves_existing_pending_join_request(self):
+        join_request = TeamJoinRequest.objects.create(
+            user=self.organization_admin,
+            team=self.team,
+        )
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.organization_admin)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": link["token"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        join_request.refresh_from_db()
+        self.assertEqual(join_request.status, TeamJoinRequest.Status.APPROVED)
+        self.assertEqual(join_request.reviewed_by, self.team_admin)
+        self.assertIsNotNone(join_request.reviewed_at)
+        self.assertEqual(TeamJoinRequest.objects.count(), 1)
+
+    def test_team_link_acceptance_rolls_back_membership_when_request_update_fails(self):
+        join_request = TeamJoinRequest.objects.create(
+            user=self.organization_admin,
+            team=self.team,
+        )
+        self.authenticate(self.team_admin)
+        link = self.create_link("team").data
+        self.authenticate(self.organization_admin)
+
+        with patch.object(
+            TeamJoinRequest,
+            "save",
+            side_effect=RuntimeError("request update failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    "/api/invitation_links/accept/",
+                    {"token": link["token"]},
+                    format="json",
+                )
+
+        join_request.refresh_from_db()
+        self.assertEqual(join_request.status, TeamJoinRequest.Status.PENDING)
+        self.assertFalse(
+            self.team.members.filter(pk=self.organization_admin.pk).exists()
+        )
+
+    def test_invalid_organization_tokens_are_rejected_without_leaking_reason(self):
         self.authenticate(self.organization_admin)
         revoked_link = self.create_link().data
         InvitationLink.objects.filter(pk=revoked_link["id"]).update(
@@ -262,14 +398,11 @@ class InvitationLinkLifecycleTests(TestCase):
             expires_at=timezone.now() - timedelta(seconds=1),
         )
 
-        self.authenticate(self.team_admin)
-        team_link = self.create_link("team").data
         self.authenticate(self.outsider)
 
         for token in [
             revoked_link["token"],
             expired_link.token,
-            team_link["token"],
             "unknown-token",
         ]:
             with self.subTest(token=token):
@@ -285,7 +418,63 @@ class InvitationLinkLifecycleTests(TestCase):
         self.assertFalse(
             expired_organization.members.filter(pk=self.outsider.pk).exists()
         )
-        self.assertFalse(self.team.members.filter(pk=self.outsider.pk).exists())
+
+    def test_closed_revoked_expired_superseded_and_unknown_team_links_return_404(self):
+        self.authenticate(self.team_admin)
+        original = self.create_link("team").data
+        regenerated = self.client.post(
+            f"/api/invitation_links/{original['id']}/regenerate/",
+            {},
+            format="json",
+        ).data
+        self.client.post(f"/api/invitation_links/{original['id']}/revoke/")
+
+        closed_team = Team.objects.create(
+            name="Closed Team",
+            organization=self.organization,
+        )
+        closed_team.admins.add(self.team_admin)
+        closed_link = self.create_link("team", closed_team.id).data
+        closed_team.visibility = Team.Visibility.CLOSED
+        closed_team.save(update_fields=["visibility"])
+
+        expired_team = Team.objects.create(
+            name="Expired Team",
+            organization=self.organization,
+        )
+        expired_team.admins.add(self.team_admin)
+        expired_link = InvitationLink.objects.create(
+            team=expired_team,
+            created_by=self.team_admin,
+            expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        self.authenticate(self.organization_admin)
+
+        for token in [
+            original["token"],
+            regenerated["token"],
+            closed_link["token"],
+            expired_link.token,
+            "unknown-team-token",
+        ]:
+            with self.subTest(token=token):
+                response = self.client.post(
+                    "/api/invitation_links/accept/",
+                    {"token": token},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.assertFalse(
+            self.team.members.filter(pk=self.organization_admin.pk).exists()
+        )
+        self.assertFalse(
+            closed_team.members.filter(pk=self.organization_admin.pk).exists()
+        )
+        self.assertFalse(
+            expired_team.members.filter(pk=self.organization_admin.pk).exists()
+        )
 
     def test_anonymous_user_cannot_accept_organization_link(self):
         self.authenticate(self.organization_admin)
@@ -300,3 +489,16 @@ class InvitationLinkLifecycleTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertFalse(self.organization.members.filter(pk=self.outsider.pk).exists())
+
+    def test_anonymous_user_cannot_accept_team_link(self):
+        self.authenticate(self.team_admin)
+        token = self.create_link("team").data["token"]
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            "/api/invitation_links/accept/",
+            {"token": token},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

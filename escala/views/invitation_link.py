@@ -13,6 +13,7 @@ from escala.models import (
     InvitationLink,
     Organization,
     Team,
+    TeamJoinRequest,
     generate_invitation_link_token,
 )
 from escala.serializers import (
@@ -123,18 +124,54 @@ class InvitationLinkViewSet(GenericViewSet):
     @action(detail=False, methods=['post'])
     def accept(self, request):
         with transaction.atomic():
-            link = InvitationLink.objects.select_for_update().filter(
-                token=request.data.get('token'),
-                revoked_at__isnull=True,
-            ).first()
-            if (
-                link is None
-                or not link.is_active
-                or self._is_closed_team_link(link)
-                or link.organization_id is None
-            ):
+            link = (
+                InvitationLink.objects.select_for_update()
+                .filter(
+                    token=request.data.get('token'),
+                    revoked_at__isnull=True,
+                )
+                .first()
+            )
+            if link is None or not link.is_active:
                 return Response(status=status.HTTP_404_NOT_FOUND)
-            link.organization.members.add(request.user)
+
+            if link.organization_id is not None:
+                link.organization.members.add(request.user)
+            else:
+                team = (
+                    Team.objects.select_for_update()
+                    .select_related('organization')
+                    .get(pk=link.team_id)
+                )
+                if team.visibility == Team.Visibility.CLOSED:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+                if not team.organization.members.filter(pk=request.user.pk).exists():
+                    raise PermissionDenied(
+                        'Você precisa fazer parte da organização desta equipe para aceitar o convite.'
+                    )
+
+                team.members.add(request.user)
+                join_request = (
+                    TeamJoinRequest.objects.select_for_update()
+                    .filter(
+                        user=request.user,
+                        team=team,
+                        status=TeamJoinRequest.Status.PENDING,
+                    )
+                    .first()
+                )
+                if join_request is not None:
+                    join_request.status = TeamJoinRequest.Status.APPROVED
+                    join_request.reviewed_by = link.created_by
+                    join_request.reviewed_at = timezone.now()
+                    join_request.save(
+                        update_fields=[
+                            'status',
+                            'reviewed_by',
+                            'reviewed_at',
+                            'updated_at',
+                        ],
+                    )
         return Response(PublicInvitationLinkSerializer(link).data)
 
     @staticmethod
