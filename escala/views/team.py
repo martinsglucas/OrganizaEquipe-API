@@ -46,19 +46,52 @@ class TeamViewSet(ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'])
+    def hub(self, request):
+        member_teams = Team.objects.filter(members=request.user).prefetch_related(
+            'admins',
+            'roles',
+            'members',
+        )
+        discoverable_teams = self._discoverable_teams_for(request.user)
+        join_requests = TeamJoinRequest.objects.filter(
+            user=request.user,
+        ).select_related(
+            'team',
+            'user',
+            'reviewed_by',
+        )
+        return Response(
+            {
+                'member_teams': TeamSerializer(member_teams, many=True).data,
+                'discoverable_teams': TeamDiscoverySerializer(
+                    discoverable_teams,
+                    many=True,
+                ).data,
+                'join_requests': TeamJoinRequestSerializer(
+                    join_requests,
+                    many=True,
+                ).data,
+            }
+        )
+
+    @action(detail=False, methods=['get'])
     def discoverable(self, request):
-        teams = Team.objects.filter(
-            organization__members=request.user,
+        teams = self._discoverable_teams_for(request.user)
+        return Response(TeamDiscoverySerializer(teams, many=True).data)
+
+    @staticmethod
+    def _discoverable_teams_for(user):
+        return Team.objects.filter(
+            organization__members=user,
             visibility=Team.Visibility.DISCOVERABLE,
         ).exclude(
-            members=request.user,
+            members=user,
         ).exclude(
             id__in=TeamJoinRequest.objects.filter(
-                user=request.user,
+                user=user,
                 status=TeamJoinRequest.Status.PENDING,
             ).values('team_id'),
         ).order_by('name').distinct()
-        return Response(TeamDiscoverySerializer(teams, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='my_join_requests')
     def my_join_requests(self, request):
