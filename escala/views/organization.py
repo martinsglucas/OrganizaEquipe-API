@@ -1,14 +1,13 @@
 from rest_framework.viewsets import ModelViewSet
-from escala.models import Organization, OrganizationCreationRequest
+from escala.models import Organization
+from escala.permissions import can_create_organization
 from drf_spectacular.utils import extend_schema
-from escala.serializers import OrganizationCreationRequestSerializer, OrganizationSerializer, RetrieveOrganizationSerializer
+from escala.serializers import CreateOrganizationSerializer, OrganizationSerializer, RetrieveOrganizationSerializer
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
-from rest_framework.viewsets import GenericViewSet
 
 class OrganizationViewSet(ModelViewSet):
     queryset = Organization.objects.all()
@@ -24,15 +23,17 @@ class OrganizationViewSet(ModelViewSet):
         
         return queryset
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action == 'create':
+            return CreateOrganizationSerializer
+        elif self.action in ['update', 'partial_update', 'destroy']:
             return OrganizationSerializer
         elif self.action in ['retrieve', 'list']:
             return RetrieveOrganizationSerializer
         return super().get_serializer_class()
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_superuser:
-            raise PermissionDenied('A criação de organizações exige aprovação da plataforma.')
+        if not can_create_organization(request.user):
+            raise PermissionDenied('Você não tem permissão para criar organizações.')
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
@@ -114,21 +115,3 @@ class OrganizationViewSet(ModelViewSet):
             )
 	# permission_classes = [AllowPostWithoutAuthentication]
 	# http_method_names = ['get', 'post', 'put', 'delete']
-
-
-class OrganizationCreationRequestViewSet(
-    CreateModelMixin,
-    ListModelMixin,
-    RetrieveModelMixin,
-    GenericViewSet,
-):
-    serializer_class = OrganizationCreationRequestSerializer
-
-    def get_queryset(self):
-        queryset = OrganizationCreationRequest.objects.select_related('organization', 'requester')
-        if self.request.user.is_superuser:
-            return queryset
-        return queryset.filter(requester=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(requester=self.request.user)

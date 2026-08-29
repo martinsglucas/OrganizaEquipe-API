@@ -1,16 +1,19 @@
 from django.conf import settings
+from django.db import transaction
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.serializers import ModelSerializer, CharField, ValidationError, HiddenField, CurrentUserDefault, PrimaryKeyRelatedField, SerializerMethodField, Serializer, ChoiceField, IntegerField, DateTimeField
-from escala.models import User, PushSubscription, Role, Team, TeamJoinRequest, Schedule, ScheduleParticipation, Unavailability, Organization, OrganizationCreationRequest, TeamInvitation, OrganizationInvitation, InvitationLink, Request
+from escala.models import User, PushSubscription, Role, Team, TeamJoinRequest, Schedule, ScheduleParticipation, Unavailability, Organization, TeamInvitation, OrganizationInvitation, InvitationLink, Request
+from escala.permissions import can_create_organization
 from django.contrib.auth import authenticate
 
 class UserSerializer(ModelSerializer):
     password = CharField(write_only=True, required=True)
+    can_create_organization = SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'password']
-        read_only_fields = ['is_active', 'is_staff', 'is_superuser']
+        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'can_create_organization', 'password']
+        read_only_fields = ['is_active', 'is_staff', 'is_superuser', 'can_create_organization']
         extra_kwargs = {
             'email': {'required': True},
         }
@@ -36,6 +39,9 @@ class UserSerializer(ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+    def get_can_create_organization(self, obj):
+        return can_create_organization(obj)
 
 class UserMemberSerializer(ModelSerializer):
     class Meta:
@@ -101,15 +107,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise ValidationError('Invalid email or password')
         
         data = super().validate(attrs)
-        data['user'] = {
-            'id': user.id,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'email': user.email,
-            'is_active': user.is_active,
-            'is_staff': user.is_staff,
-            'is_superuser': user.is_superuser
-        }
+        data['user'] = UserSerializer(user).data
 
         return data
 
@@ -252,6 +250,24 @@ class RetrieveOrganizationSerializer(ModelSerializer):
     def get_members(self, obj):
         return UserMemberSerializer(obj.members.order_by("first_name"), many=True).data
 
+class CreateOrganizationSerializer(ModelSerializer):
+    code_access = CharField(read_only=True)
+    admins = UserMemberSerializer(many=True, read_only=True)
+    members = UserMemberSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Organization
+        fields = ['id', 'name', 'code_access', 'admins', 'members']
+
+    @transaction.atomic
+    def create(self, validated_data):
+        user = self.context['request'].user
+        organization = Organization.objects.create(**validated_data)
+        organization.admins.add(user)
+        organization.members.add(user)
+        return organization
+
+
 class OrganizationSerializer(ModelSerializer):
     admins = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
     members = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
@@ -269,44 +285,6 @@ class OrganizationSerializer(ModelSerializer):
         if members_data is not None:
             instance.members.set(members_data)
         return instance
-
-
-class OrganizationCreationRequestSerializer(ModelSerializer):
-    requester = PrimaryKeyRelatedField(read_only=True)
-
-    class Meta:
-        model = OrganizationCreationRequest
-        fields = [
-            'id',
-            'requester',
-            'name',
-            'status',
-            'organization',
-            'reviewed_at',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = [
-            'id',
-            'status',
-            'organization',
-            'reviewed_at',
-            'created_at',
-            'updated_at',
-        ]
-
-    def validate_name(self, value):
-        name = value.strip()
-        if not name:
-            raise ValidationError('O nome da organização é obrigatório.')
-        requester = self.context['request'].user
-        if OrganizationCreationRequest.objects.filter(
-            requester=requester,
-            name__iexact=name,
-            status=OrganizationCreationRequest.Status.PENDING,
-        ).exists():
-            raise ValidationError('Já existe uma solicitação pendente para esta organização.')
-        return name
     
 class RetrieveOrganizationInvitationSerializer(ModelSerializer):
     organization = RetrieveOrganizationSerializer()

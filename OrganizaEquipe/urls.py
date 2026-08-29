@@ -11,7 +11,6 @@ from escala.views import (
     UserViewSet,
     RoleViewSet,
     OrganizationViewSet,
-    OrganizationCreationRequestViewSet,
     TeamViewSet,
     ScheduleViewSet,
     UnavailabilityViewSet,
@@ -26,7 +25,6 @@ from escala.views import (
 router = routers.DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'organizations', OrganizationViewSet)
-router.register(r'organization_requests', OrganizationCreationRequestViewSet, basename='organization-requests')
 router.register(r'roles', RoleViewSet)
 router.register(r'teams', TeamViewSet)
 router.register(r'schedules', ScheduleViewSet)

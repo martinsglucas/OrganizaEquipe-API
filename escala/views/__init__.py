@@ -1,7 +1,7 @@
 from .user import UserViewSet
 from .customTokenObtainPairView import CustomTokenObtainPairView, CookieTokenRefreshView, LogoutView
 from .role import RoleViewSet
-from .organization import OrganizationCreationRequestViewSet, OrganizationViewSet
+from .organization import OrganizationViewSet
 from .team import TeamViewSet
 from .schedule import ScheduleViewSet
 from .unavailability import UnavailabilityViewSet

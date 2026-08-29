@@ -9,10 +9,9 @@ from firebase_admin import messaging
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from escala.admin import OrganizationCreationRequestAdmin, PushSubscriptionAdmin
+from escala.admin import PushSubscriptionAdmin
 from escala.models import (
     Organization,
-    OrganizationCreationRequest,
     PushSubscription,
     Role,
     Schedule,
@@ -37,7 +36,7 @@ USER_GROUP_PERMISSION_CODENAMES = {
         "user",
     )
     for action in ("add", "change", "delete", "view")
-}
+} - {"add_organization"}
 
 
 class DefaultUsersGroupTests(TestCase):
@@ -61,15 +60,20 @@ class DefaultUsersGroupTests(TestCase):
     def test_permission_synchronization_restores_group_idempotently(self):
         from escala.signals import synchronize_default_users_group
 
-        Group.objects.filter(name="Users").delete()
+        Group.objects.filter(name__in=["Users", "Organization Creators"]).delete()
 
         synchronize_default_users_group(sender=None, using="default")
         synchronize_default_users_group(sender=None, using="default")
 
         group = Group.objects.get(name="Users")
+        creator_group = Group.objects.get(name="Organization Creators")
         self.assertSetEqual(
             set(group.permissions.values_list("codename", flat=True)),
             USER_GROUP_PERMISSION_CODENAMES,
+        )
+        self.assertEqual(
+            list(creator_group.permissions.values_list("codename", flat=True)),
+            ["add_organization"],
         )
 
 
@@ -171,144 +175,6 @@ class ScheduleNotificationFailureTests(TestCase):
         self.invalid_subscription.refresh_from_db()
         self.assertTrue(self.valid_subscription.is_active)
         self.assertTrue(self.invalid_subscription.is_active)
-
-
-class OrganizationCreationRequestApiTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="member@example.com",
-            password="test-password",
-            first_name="Member",
-        )
-        self.superuser = User.objects.create_superuser(
-            email="admin@example.com",
-            password="test-password",
-            first_name="Admin",
-        )
-        self.client = APIClient()
-
-    def test_regular_user_creates_request_instead_of_organization(self):
-        self.client.force_authenticate(self.user)
-
-        response = self.client.post(
-            "/api/organization_requests/",
-            {"name": "Community Church"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["status"], OrganizationCreationRequest.Status.PENDING)
-        self.assertEqual(response.data["requester"], self.user.id)
-        self.assertFalse(Organization.objects.filter(name="Community Church").exists())
-
-    def test_regular_user_cannot_create_organization_directly(self):
-        self.client.force_authenticate(self.user)
-
-        response = self.client.post(
-            "/api/organizations/",
-            {"name": "Bypass", "admins": [self.user.id], "members": [self.user.id]},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertFalse(Organization.objects.filter(name="Bypass").exists())
-
-    def test_user_only_lists_their_own_requests(self):
-        own_request = OrganizationCreationRequest.objects.create(
-            requester=self.user,
-            name="Own request",
-        )
-        OrganizationCreationRequest.objects.create(
-            requester=self.superuser,
-            name="Other request",
-        )
-        self.client.force_authenticate(self.user)
-
-        response = self.client.get("/api/organization_requests/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual([item["id"] for item in response.data], [own_request.id])
-
-    def test_duplicate_pending_request_is_rejected(self):
-        OrganizationCreationRequest.objects.create(
-            requester=self.user,
-            name="Community Church",
-        )
-        self.client.force_authenticate(self.user)
-
-        response = self.client.post(
-            "/api/organization_requests/",
-            {"name": "Community Church"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            OrganizationCreationRequest.objects.filter(
-                requester=self.user,
-                name="Community Church",
-                status=OrganizationCreationRequest.Status.PENDING,
-            ).count(),
-            1,
-        )
-
-    def test_superuser_approval_creates_organization_and_memberships_once(self):
-        creation_request = OrganizationCreationRequest.objects.create(
-            requester=self.user,
-            name="Community Church",
-        )
-
-        organization = creation_request.approve(self.superuser)
-        repeated_organization = creation_request.approve(self.superuser)
-
-        creation_request.refresh_from_db()
-        self.assertEqual(creation_request.status, OrganizationCreationRequest.Status.APPROVED)
-        self.assertEqual(creation_request.organization, organization)
-        self.assertEqual(repeated_organization, organization)
-        self.assertTrue(organization.admins.filter(id=self.user.id).exists())
-        self.assertTrue(organization.members.filter(id=self.user.id).exists())
-        self.assertEqual(Organization.objects.filter(name="Community Church").count(), 1)
-
-    def test_rejection_preserves_status_without_creating_organization(self):
-        creation_request = OrganizationCreationRequest.objects.create(
-            requester=self.user,
-            name="Community Church",
-        )
-
-        creation_request.reject(self.superuser)
-
-        creation_request.refresh_from_db()
-        self.assertEqual(creation_request.status, OrganizationCreationRequest.Status.REJECTED)
-        self.assertIsNone(creation_request.organization)
-        self.assertFalse(Organization.objects.filter(name="Community Church").exists())
-
-
-class OrganizationCreationRequestAdminTests(TestCase):
-    def setUp(self):
-        self.regular_staff = User.objects.create_user(
-            email="staff@example.com",
-            password="test-password",
-            first_name="Staff",
-            is_staff=True,
-        )
-        self.superuser = User.objects.create_superuser(
-            email="admin@example.com",
-            password="test-password",
-            first_name="Admin",
-        )
-        self.model_admin = OrganizationCreationRequestAdmin(
-            OrganizationCreationRequest,
-            admin.site,
-        )
-
-    def test_only_superuser_can_manage_requests_in_admin(self):
-        regular_request = type("Request", (), {"user": self.regular_staff})()
-        superuser_request = type("Request", (), {"user": self.superuser})()
-
-        self.assertFalse(self.model_admin.has_module_permission(regular_request))
-        self.assertFalse(self.model_admin.has_change_permission(regular_request))
-        self.assertTrue(self.model_admin.has_module_permission(superuser_request))
-        self.assertTrue(self.model_admin.has_change_permission(superuser_request))
 
 
 class PushSubscriptionAdminTests(TestCase):

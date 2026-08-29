@@ -3,6 +3,25 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from escala.models import Team
 
 
+ORGANIZATION_CREATOR_GROUP_NAME = 'Organization Creators'
+
+
+def can_create_organization(user):
+    return bool(
+        user
+        and user.is_authenticated
+        and (
+            user.is_superuser
+            or (
+                user.groups.filter(
+                    name=ORGANIZATION_CREATOR_GROUP_NAME,
+                ).exists()
+                and user.has_perm('escala.add_organization')
+            )
+        )
+    )
+
+
 class AllowPostWithoutAuthentication(BasePermission):
     """
     Permite acesso não autenticado apenas para o método POST.
