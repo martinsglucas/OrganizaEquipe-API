@@ -52,11 +52,7 @@ class UserAdmin(BaseUserAdmin):
 
 admin.site.register(User, UserAdmin)
 admin.site.register(Role)
-admin.site.register(Unavailability)
-admin.site.register(ScheduleParticipation)
 admin.site.register(Organization)
-admin.site.register(TeamInvitation)
-admin.site.register(OrganizationInvitation)
 admin.site.register(Request)
 
 
@@ -136,9 +132,67 @@ class ScheduleParticipationInline(admin.TabularInline):
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     inlines = (RoleInline,)
-    list_display = ('name', 'code_access')
+    list_display = ('name', 'organization', 'visibility', 'code_access')
+    list_filter = ('organization', 'visibility')
     search_fields = ('name', 'code_access')
+    list_select_related = ('organization',)
+    ordering = ('name', 'pk')
 
 @admin.register(Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
     inlines = (ScheduleParticipationInline,)
+    list_display = ('name', 'team', 'date', 'hour')
+    list_filter = ('team', 'date')
+    search_fields = ('name', 'team__name')
+    list_select_related = ('team',)
+    ordering = ('-date', '-hour', 'name', 'pk')
+
+
+@admin.register(ScheduleParticipation)
+class ScheduleParticipationAdmin(admin.ModelAdmin):
+    list_display = ('schedule', 'user', 'confirmation')
+    list_filter = ('confirmation', 'schedule__team')
+    search_fields = (
+        'schedule__name',
+        'user__email',
+        'user__first_name',
+        'user__last_name',
+    )
+    list_select_related = ('schedule', 'schedule__team', 'user')
+    ordering = ('confirmation', 'pk')
+
+
+@admin.register(Unavailability)
+class UnavailabilityAdmin(admin.ModelAdmin):
+    list_display = ('description', 'user', 'start_date', 'end_date')
+    list_filter = ('start_date', 'end_date')
+    search_fields = (
+        'description',
+        'user__email',
+        'user__first_name',
+        'user__last_name',
+    )
+    list_select_related = ('user',)
+    ordering = ('-start_date', '-end_date', 'pk')
+
+
+@admin.register(TeamInvitation)
+class TeamInvitationAdmin(admin.ModelAdmin):
+    list_display = ('recipient_email', 'sender_name', 'team')
+    list_filter = ('team',)
+    search_fields = ('recipient_email', 'sender_name', 'team__name')
+    list_select_related = ('team',)
+    ordering = ('recipient_email', 'pk')
+
+
+@admin.register(OrganizationInvitation)
+class OrganizationInvitationAdmin(admin.ModelAdmin):
+    list_display = ('recipient_email', 'sender_name', 'organization')
+    list_filter = ('organization',)
+    search_fields = (
+        'recipient_email',
+        'sender_name',
+        'organization__name',
+    )
+    list_select_related = ('organization',)
+    ordering = ('recipient_email', 'pk')
